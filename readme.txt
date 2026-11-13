@@ -4,7 +4,7 @@ Tags: recipe, recipes, nutrition, food, schema
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -242,6 +242,22 @@ WordPress oEmbed provider list: https://developer.wordpress.org/advanced-adminis
 
 == Changelog ==
 
+= 1.0.1 =
+* New: App Manager. Switch the optional parts of the plugin (reviews, collections, favorites, shopping lists, nutrition, recipe submissions) on and off from one screen.
+* New: the recipe search shortcode filters the listing it sits beside, and "load more" and pagination keep the search.
+* Security: publishing a recipe, taking a published recipe down and moderating reviews now need the publish capability (Authors and above by default). Contributors can still write drafts and submit them for review.
+* Security: the colours, sizes, fonts and shadow of a View are validated when the View is saved and again when it is printed.
+* Security: a shopping list can only be read or changed by the user it belongs to.
+* Fixed: "load more", page numbers and infinite scroll keep working on a page served from a page cache, however old the cached copy is.
+* Fixed: on cached pages, loading more reviews, voting a review helpful and sending a review or a recipe no longer fail with an expired security token.
+* Fixed: the "load more" button now says so when a request fails, instead of doing nothing.
+* Fixed: an address for a recipe or a recipe archive that does not exist answers 404 instead of showing the blog.
+* Fixed: recipe listings are styled in the Elementor editor preview.
+* Fixed: "load more" is no longer shown under a listing that already fits on one page.
+* Fixed: a review rating outside 1 to 5 is refused, and mistyping a form no longer counts against the hourly submission limit.
+* Changed: ten settings that had no effect were removed from the Settings screen.
+* Changed: the plugin is now built from independent modules, each owning its own database tables.
+
 = 1.0.0 =
 * Initial release
 * React admin panel for recipes, categories, cuisines, and courses
@@ -254,6 +270,9 @@ WordPress oEmbed provider list: https://developer.wordpress.org/advanced-adminis
 * REST API and developer hooks
 
 == Upgrade Notice ==
+
+= 1.0.1 =
+Security and caching release. Publishing recipes and moderating reviews now need the publish capability, and listings keep working on pages served from a page cache. Recommended for every site.
 
 = 1.0.0 =
 Initial release of Plugixa Recipe.

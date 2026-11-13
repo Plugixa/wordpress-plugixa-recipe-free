@@ -261,7 +261,7 @@
                     e.stopPropagation();
                     this.fileInput.value = '';
                     this.previewWrap.classList.add('pxr:hidden');
-                    this.previewImg.src = '';
+                    this.previewImg.removeAttribute('src');
                     zone.classList.remove('has-preview');
                 });
             }
@@ -726,9 +726,11 @@
         submitRecipe(formData) {
             this.setLoading(true);
 
+            // Only a signed-in user's page has a nonce (plugixa_recipe_rest_nonce()); a visitor
+            // sends none, because an empty or stale X-WP-Nonce is answered with a 403.
             fetch(this.apiUrl, {
                 method: 'POST',
-                headers: { 'X-WP-Nonce': this.nonce },
+                headers: this.nonce ? { 'X-WP-Nonce': this.nonce } : {},
                 body: formData,
                 credentials: 'same-origin',
             })
@@ -772,7 +774,7 @@
             // Reset image preview.
             if (this.previewWrap) {
                 this.previewWrap.classList.add('pxr:hidden');
-                this.previewImg.src = '';
+                this.previewImg.removeAttribute('src');
                 const zone = this.wrapper.querySelector('[data-pxr-upload-zone]');
                 if (zone) zone.classList.remove('has-preview');
             }

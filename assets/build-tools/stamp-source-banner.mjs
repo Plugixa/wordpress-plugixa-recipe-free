@@ -65,7 +65,7 @@ const TARGETS = {
     // the premium overlay. Deciding on the env var alone sent the documented
     // `npm run build` on the free ZIP looking for pro/assets/backend/build.
     outDir: () =>
-      process.env.PLUGIXA_TARGET === 'free' || !existsSync(resolve(PLUGIN_ROOT, 'assets/backend/app/src/pro/index.ts'))
+      process.env.PLUGIXA_TARGET === 'free' || !existsSync(resolve(PLUGIN_ROOT, 'assets/backend/app/src/pro/index.tsx'))
         ? '../build'
         : '../../../pro/assets/backend/build',
     // SOURCE.txt goes here as well as in outDir, so a reviewer opening the parent
@@ -94,11 +94,25 @@ const TARGETS = {
  * Guideline 4 covers "developer libraries you've included", not only first-party
  * code, and each of these carries a long minified line that a scanner will quote.
  * GLightbox is the barest of them: its line 1 is code, with no header at all.
+ *
+ * The version in each banner is read from the installed package, never typed by hand:
+ * the banner states the exact upstream version, and a hard-coded "Swiper 12.1.2" went
+ * stale on the first dependency bump while the file under it was 14.x. It is a getter so
+ * only the vendor target reads it: the free ZIP has no node_modules, and the backend
+ * rebuild documented in SOURCE.txt must still run there.
  */
+const vendorLib = (name, pkg) => {
+  const manifest = resolve(PLUGIN_ROOT, 'assets/frontend/node_modules', pkg, 'package.json');
+  if (!existsSync(manifest)) {
+    throw new Error(`stamp-source-banner: ${pkg} is not installed; run npm install in assets/frontend`);
+  }
+  return `${name} ${JSON.parse(readFileSync(manifest, 'utf8')).version}`;
+};
+
 const VENDOR_FILES = [
   {
     file: 'assets/frontend/vendor/swiper/swiper-bundle.min.js',
-    lib: 'Swiper 12.1.2',
+    get lib() { return vendorLib('Swiper', 'swiper'); },
     license: 'MIT',
     upstream: 'https://github.com/nolimits4web/swiper',
     pinned: 'assets/frontend/package-lock.json',
@@ -106,7 +120,7 @@ const VENDOR_FILES = [
   },
   {
     file: 'assets/frontend/vendor/swiper/swiper-bundle.min.css',
-    lib: 'Swiper 12.1.2',
+    get lib() { return vendorLib('Swiper', 'swiper'); },
     license: 'MIT',
     upstream: 'https://github.com/nolimits4web/swiper',
     pinned: 'assets/frontend/package-lock.json',
@@ -114,7 +128,7 @@ const VENDOR_FILES = [
   },
   {
     file: 'assets/frontend/vendor/glightbox/glightbox.min.js',
-    lib: 'GLightbox 3.3.1',
+    get lib() { return vendorLib('GLightbox', 'glightbox'); },
     license: 'MIT',
     upstream: 'https://github.com/biati-digital/glightbox',
     pinned: 'assets/frontend/package-lock.json',
@@ -122,7 +136,7 @@ const VENDOR_FILES = [
   },
   {
     file: 'assets/frontend/vendor/glightbox/glightbox.min.css',
-    lib: 'GLightbox 3.3.1',
+    get lib() { return vendorLib('GLightbox', 'glightbox'); },
     license: 'MIT',
     upstream: 'https://github.com/biati-digital/glightbox',
     pinned: 'assets/frontend/package-lock.json',

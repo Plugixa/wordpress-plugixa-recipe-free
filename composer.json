@@ -14,9 +14,9 @@
         "freemius/wordpress-sdk": "2.13.4"
     },
     "autoload": {
-        "classmap": [
-            "includes/"
-        ]
+        "psr-4": {
+            "PlugixaRecipe\\": "includes/"
+        }
     },
     "config": {
         "optimize-autoloader": true,

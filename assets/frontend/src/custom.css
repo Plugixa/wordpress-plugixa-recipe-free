@@ -1552,6 +1552,10 @@
 
 .pxr-custom-input,
 .pxr-custom-textarea {
+    /* The fields are width: 100%. A theme that leaves box-sizing at content-box (Twenty
+       Twenty-Five does) adds their padding and border on top, and they run 26px past the
+       column. */
+    box-sizing: border-box;
     border-color: var(--pxr-border-color, #e5e7eb);
     background: #ffffff;
     color: var(--pxr-text-color, #1a1a2e);

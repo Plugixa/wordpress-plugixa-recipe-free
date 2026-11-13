@@ -4,7 +4,7 @@
  * Plugin Name: Plugixa Recipe
  * Plugin URI: https://www.plugixa.com/plugins/plugixa-recipe
  * Description: A modern recipe management plugin with React admin panel, nutrition facts, user reviews, collections, meal planning, and multiple display layouts.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Plugixa
  * Author URI: https://plugixa.com
  * Copyright (C) 2026 Plugixa (https://plugixa.com)
@@ -18,17 +18,27 @@
  * Parser library in pro/vendor/ with its own autoloader, and the compiled pro admin
  * bundle in pro/assets/backend/build/. Freemius strips these paths from the
  * auto-generated free version, so the free build ships no premium code or
- * premium-only libraries. The human-readable app source (assets/backend/app,
- * assets/frontend) ships inside the release ZIPs; the free build carries the
- * free-buildable set only (the pro admin modules under assets/backend/app/src/pro
- * are premium). Build instructions are in readme.txt (== Source Code ==).
+ * premium-only libraries. The human-readable source of the compiled admin app is
+ * assets/backend/app/ (the pro admin modules under assets/backend/app/src/pro are
+ * premium and are not part of the free build). Every compiled directory carries a
+ * SOURCE.txt that names its source and the exact command that rebuilds it.
  *
  */
 if ( !defined( 'ABSPATH' ) ) {
     exit;
 }
+// The free and the premium build live in different folders (plugixa-recipe and
+// plugixa-recipe-premium), so for the length of one request both can be on the site: the
+// request that activates one while the other is still active. The copy that loaded first
+// is the plugin for that request. This one only tells Freemius which file it is - that is
+// what makes Freemius deactivate the other build - and stops, instead of defining the
+// constants and registering every hook a second time.
+if ( function_exists( 'plugixa_recipe_fs_pxr' ) ) {
+    plugixa_recipe_fs_pxr()->set_basename( is_dir( __DIR__ . '/pro' ), __FILE__ );
+    return;
+}
 // Plugin constants
-define( 'PLUGIXA_RECIPE_VERSION', '1.0.0' );
+define( 'PLUGIXA_RECIPE_VERSION', '1.0.1' );
 define( 'PLUGIXA_RECIPE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'PLUGIXA_RECIPE_URL', plugin_dir_url( __FILE__ ) );
 define( 'PLUGIXA_RECIPE_BASENAME', plugin_basename( __FILE__ ) );
@@ -85,43 +95,49 @@ if ( !function_exists( 'plugixa_recipe_fs_pxr' ) ) {
     do_action( 'plugixa_recipe_fs_pxr_loaded' );
 }
 /**
- * PSR-4 style autoloader for plugin classes.
- * Resolves from pro/includes/ first (when shipped), falls back to includes/.
+ * The free classes are PSR-4 under includes/ and loaded by Composer (composer.json maps
+ * PlugixaRecipe\ to includes/). This loader covers the two things Composer must not know:
+ * the legacy uninstall callback name, and the premium tree -
+ *
+ *   PlugixaRecipe\Pro\Modules\Schema\Module  ->  pro/includes/Modules/Schema/Module.php
+ *
+ * - which is absent from the free build and so stays out of the committed classmap: a free
+ * ZIP whose autoloader lists premium classes is naming premium features.
  */
 spl_autoload_register( function ( $class ) {
-    $prefix = 'PlugixaRecipe\\';
-    $len = strlen( $prefix );
-    if ( strncmp( $prefix, $class, $len ) !== 0 ) {
+    // The uninstall callback is stored in the database by its class name. A site that last
+    // registered it before the Uninstaller moved into Core still holds the old name, and
+    // WordPress calls it without consulting this file's register_uninstall_hook() again -
+    // so the old name has to keep resolving for as long as such a site can exist.
+    if ( 'PlugixaRecipe\\Uninstaller' === $class ) {
+        class_alias( 'PlugixaRecipe\\Core\\Uninstaller', $class );
         return;
     }
-    $relative_class = substr( $class, $len );
-    $parts = explode( '\\', $relative_class );
-    $class_name = array_pop( $parts );
-    // Convert CamelCase to kebab-case: RecipesController -> recipes-controller
-    $file_name = 'class-' . strtolower( preg_replace( '/([a-z])([A-Z])/', '$1-$2', $class_name ) ) . '.php';
-    $dir_path = '';
-    if ( !empty( $parts ) ) {
-        $dir_path = strtolower( implode( '/', $parts ) ) . '/';
+    $prefix = 'PlugixaRecipe\\Pro\\';
+    if ( strncmp( $prefix, $class, strlen( $prefix ) ) !== 0 ) {
+        return;
     }
-    foreach ( [PLUGIXA_RECIPE_PATH . 'pro/includes/', PLUGIXA_RECIPE_PATH . 'includes/'] as $base_dir ) {
-        $file = $base_dir . $dir_path . $file_name;
-        if ( file_exists( $file ) ) {
-            require $file;
-            return;
-        }
+    $file = PLUGIXA_RECIPE_PATH . 'pro/includes/' . str_replace( '\\', '/', substr( $class, strlen( $prefix ) ) ) . '.php';
+    if ( file_exists( $file ) ) {
+        require $file;
     }
 } );
+// Global helper functions (plugixa_recipe_allowed_html, plugixa_recipe_user_can, ...) and the
+// safecss_filter_attr_allow_css hook that keeps --pxr-* custom properties alive through
+// wp_kses(). The one file in includes/ that is not a class, so it is loaded by hand - here
+// rather than on plugins_loaded, because activation runs plugin code without that hook.
+require_once PLUGIXA_RECIPE_PATH . 'includes/Core/helpers.php';
 /**
  * Plugin activation hook
  */
 register_activation_hook( __FILE__, function () {
-    \PlugixaRecipe\Activator::activate();
+    \PlugixaRecipe\Core\Activator::activate();
 } );
 /**
  * Plugin deactivation hook
  */
 register_deactivation_hook( __FILE__, function () {
-    \PlugixaRecipe\Deactivator::deactivate();
+    \PlugixaRecipe\Core\Deactivator::deactivate();
 } );
 /**
  * Plugin uninstall cleanup.
@@ -141,13 +157,13 @@ register_deactivation_hook( __FILE__, function () {
  * The callback must stay a named static: register_uninstall_hook() serialises it into an
  * option, so a closure cannot be used here.
  */
-register_uninstall_hook( __FILE__, array('\\PlugixaRecipe\\Uninstaller', 'on_uninstall') );
+register_uninstall_hook( __FILE__, array('\\PlugixaRecipe\\Core\\Uninstaller', 'on_uninstall') );
 plugixa_recipe_fs_pxr()->add_action( 'after_uninstall', function () {
-    \PlugixaRecipe\Uninstaller::uninstall();
+    \PlugixaRecipe\Core\Uninstaller::uninstall();
 } );
 /**
  * Initialize the plugin
  */
 add_action( 'plugins_loaded', function () {
-    \PlugixaRecipe\Plugin::instance();
+    \PlugixaRecipe\Core\Plugin::instance();
 } );

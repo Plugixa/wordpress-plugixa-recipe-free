@@ -210,7 +210,11 @@
             submitData.append('author_name', authorName);
             submitData.append('author_email', authorEmail);
             submitData.append('review_text', reviewText);
-            submitData.append('_wpnonce', nonce);
+            // Only a signed-in user's page has a nonce (plugixa_recipe_rest_nonce()). An empty
+            // `_wpnonce` is not "no nonce" to WordPress: it is one that fails, and a 403.
+            if (nonce) {
+                submitData.append('_wpnonce', nonce);
+            }
 
             // Append selected images.
             selectedFiles.forEach(function (file) {
@@ -236,7 +240,7 @@
 
             fetch(restUrl, {
                 method: 'POST',
-                headers: { 'X-WP-Nonce': nonce },
+                headers: nonce ? { 'X-WP-Nonce': nonce } : {},
                 body: formPayload,
                 credentials: 'same-origin'
             })

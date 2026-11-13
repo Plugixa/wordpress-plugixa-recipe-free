@@ -156,6 +156,127 @@
         });
     }
 
+    /* ─── Requests from a page that may be days old ── */
+
+    // A listing is expected to sit in a page cache, so everything on it has to work on a
+    // page that is days old. Two things on such a page have expired: the nonce printed
+    // for "load more" (admin-ajax then answers 403), and - for a signed-out visitor - any
+    // REST nonce, which is why the page no longer carries one (see restHeaders()).
+
+    /**
+     * Headers for a REST request: the nonce only when the page has one.
+     *
+     * PHP prints a REST nonce for a signed-in user and an empty string for a visitor
+     * (plugixa_recipe_rest_nonce()). A visitor needs none on a public route, and a stale or
+     * EMPTY X-WP-Nonce is not ignored by WordPress - it is answered with 403 before the
+     * route runs. So the header is left out entirely when there is nothing to send.
+     */
+    function restHeaders(headers) {
+        headers = headers || {};
+        if (typeof plugixaRecipeConfig !== 'undefined' && plugixaRecipeConfig.restNonce) {
+            headers['X-WP-Nonce'] = plugixaRecipeConfig.restNonce;
+        }
+        return headers;
+    }
+
+    var freshListingNonce = null;
+
+    function listingAjaxUrl() {
+        return (typeof plugixaRecipeConfig !== 'undefined' && plugixaRecipeConfig.ajaxUrl)
+            ? plugixaRecipeConfig.ajaxUrl
+            : (window.ajaxurl || '/wp-admin/admin-ajax.php');
+    }
+
+    function listingText(key, fallback) {
+        return (typeof plugixaRecipeConfig !== 'undefined' && plugixaRecipeConfig.i18n && plugixaRecipeConfig.i18n[key])
+            ? plugixaRecipeConfig.i18n[key]
+            : fallback;
+    }
+
+    function listingErrorText() {
+        return listingText('error', 'An error occurred while loading recipes.');
+    }
+
+    function postListingPage(configKey, page, nonce) {
+        var formData = new FormData();
+        formData.append('action', 'plugixa_recipe_load_recipes');
+        formData.append('nonce', nonce);
+        formData.append('page', page);
+        formData.append('config_key', configKey);
+
+        return fetch(listingAjaxUrl(), { method: 'POST', body: formData, credentials: 'same-origin' });
+    }
+
+    function fetchFreshListingNonce() {
+        var url = listingAjaxUrl();
+        url += (url.indexOf('?') === -1 ? '?' : '&') + 'action=plugixa_recipe_fresh_nonce';
+
+        return fetch(url, { credentials: 'same-origin', cache: 'no-store' })
+            .then(function (response) { return response.json(); })
+            .then(function (answer) {
+                if (!answer || !answer.success || !answer.data || !answer.data.nonce) {
+                    throw new Error('no nonce');
+                }
+                freshListingNonce = answer.data.nonce;
+                return freshListingNonce;
+            });
+    }
+
+    /**
+     * One page of a listing: the single request path for "load more", the page numbers
+     * and infinite scroll.
+     *
+     * When the page's own nonce is refused the request asks for a current one and is sent
+     * once more; that nonce is kept for the rest of the visit. Resolves with
+     * { html, has_more }. Every refusal REJECTS, so each caller can say something: these
+     * controls used to do nothing at all when the server said no.
+     */
+    function loadListingPage(configKey, page, pageNonce) {
+        return postListingPage(configKey, page, freshListingNonce || pageNonce)
+            .then(function (response) {
+                if (response.status !== 403) return response;
+                return fetchFreshListingNonce().then(function (nonce) {
+                    return postListingPage(configKey, page, nonce);
+                });
+            })
+            .then(function (response) { return response.json(); })
+            .then(function (answer) {
+                if (!answer || !answer.success || !answer.data) {
+                    throw new Error('refused');
+                }
+                return answer.data;
+            });
+    }
+
+    function appendListingItems(grid, html) {
+        var temp = document.createElement('div');
+        temp.innerHTML = html || '';
+        temp.querySelectorAll('.pxr-custom-grid__item, .pxr-custom-masonry__item, .pxr-custom-list__item').forEach(function (item) {
+            grid.appendChild(item);
+        });
+        initVideoCards();
+    }
+
+    /** A line under a control that failed, for the controls that have no spinner to speak through. */
+    function showListingError(control) {
+        var note = control.parentNode.querySelector('.pxr-listing-error');
+        if (!note) {
+            note = document.createElement('p');
+            note.className = 'pxr-listing-error';
+            note.setAttribute('role', 'alert');
+            note.style.textAlign = 'center';
+            note.style.margin = '12px 0 0';
+            control.parentNode.insertBefore(note, control.nextSibling);
+        }
+        note.textContent = listingErrorText();
+        note.style.display = '';
+    }
+
+    function clearListingError(control) {
+        var note = control.parentNode.querySelector('.pxr-listing-error');
+        if (note) note.style.display = 'none';
+    }
+
     /* ─── Load More Pagination ─────────────────────── */
     function initLoadMore() {
         document.querySelectorAll('.pxr-load-more').forEach(function (btn) {
@@ -172,60 +293,40 @@
 
                 if (!grid || !configKey) return;
 
+                // The message stays next to the button after a failure, so the visitor can
+                // read it and try again. (It used to be written and hidden in the same tick.)
+                var failed = false;
+
                 btn.disabled = true;
-                if (spinner) spinner.style.display = 'inline';
+                if (spinner) {
+                    spinner.textContent = listingText('loading', 'Loading...');
+                    spinner.style.display = 'inline';
+                }
 
-                var formData = new FormData();
-                formData.append('action', 'plugixa_recipe_load_recipes');
-                formData.append('nonce', nonce);
-                formData.append('page', page);
-                formData.append('config_key', configKey);
-
-                var ajaxUrl = (typeof plugixaRecipeConfig !== 'undefined' && plugixaRecipeConfig.ajaxUrl)
-                    ? plugixaRecipeConfig.ajaxUrl
-                    : (window.ajaxurl || '/wp-admin/admin-ajax.php');
-
-                fetch(ajaxUrl, {
-                    method: 'POST',
-                    body: formData,
-                    credentials: 'same-origin'
-                })
-                .then(function (response) { return response.json(); })
+                loadListingPage(configKey, page, nonce)
                 .then(function (data) {
-                    if (data.success && data.data.html) {
-                        // Parse the response HTML and append the recipe items
-                        var temp = document.createElement('div');
-                        temp.innerHTML = data.data.html;
-                        var newItems = temp.querySelectorAll('.pxr-custom-grid__item, .pxr-custom-masonry__item, .pxr-custom-list__item');
-                        newItems.forEach(function (item) {
-                            grid.appendChild(item);
-                        });
-                        initVideoCards();
+                    appendListingItems(grid, data.html);
 
-                        btn.setAttribute('data-page', page + 1);
+                    btn.setAttribute('data-page', page + 1);
 
-                        if (!data.data.has_more) {
-                            btn.style.display = 'none';
-                            if (spinner) {
-                                spinner.textContent = (typeof plugixaRecipeConfig !== 'undefined' && plugixaRecipeConfig.i18n && plugixaRecipeConfig.i18n.noMore)
-                                    ? plugixaRecipeConfig.i18n.noMore
-                                    : 'No more recipes to load.';
-                                spinner.style.display = 'inline';
-                            }
+                    if (!data.has_more) {
+                        btn.style.display = 'none';
+                        if (spinner) {
+                            spinner.textContent = listingText('noMore', 'No more recipes to load.');
+                            spinner.style.display = 'inline';
                         }
                     }
                 })
                 .catch(function () {
+                    failed = true;
                     if (spinner) {
-                        spinner.textContent = (typeof plugixaRecipeConfig !== 'undefined' && plugixaRecipeConfig.i18n && plugixaRecipeConfig.i18n.error)
-                            ? plugixaRecipeConfig.i18n.error
-                            : 'An error occurred while loading recipes.';
+                        spinner.textContent = listingErrorText();
                         spinner.style.display = 'inline';
                     }
                 })
                 .finally(function () {
                     btn.disabled = false;
-                    if (spinner && btn.style.display !== 'none') {
+                    if (spinner && !failed && btn.style.display !== 'none') {
                         spinner.style.display = 'none';
                     }
                 });
@@ -252,36 +353,24 @@
                 // Loading state
                 nav.style.opacity = '0.5';
                 nav.style.pointerEvents = 'none';
+                clearListingError(nav);
 
-                var formData = new FormData();
-                formData.append('action', 'plugixa_recipe_load_recipes');
-                formData.append('nonce', nonce);
-                formData.append('page', page);
-                formData.append('config_key', configKey);
-
-                var ajaxUrl = (typeof plugixaRecipeConfig !== 'undefined' && plugixaRecipeConfig.ajaxUrl)
-                    ? plugixaRecipeConfig.ajaxUrl
-                    : (window.ajaxurl || '/wp-admin/admin-ajax.php');
-
-                fetch(ajaxUrl, { method: 'POST', body: formData, credentials: 'same-origin' })
-                .then(function (r) { return r.json(); })
+                loadListingPage(configKey, page, nonce)
                 .then(function (data) {
-                    if (data.success && data.data.html) {
-                        // Replace grid contents
-                        var temp = document.createElement('div');
-                        temp.innerHTML = data.data.html;
-                        var newItems = temp.querySelectorAll('.pxr-custom-grid__item, .pxr-custom-masonry__item, .pxr-custom-list__item');
-                        grid.innerHTML = '';
-                        newItems.forEach(function (item) { grid.appendChild(item); });
-                        initVideoCards();
+                    // Replace grid contents
+                    grid.innerHTML = '';
+                    appendListingItems(grid, data.html);
 
-                        // Update active page button
-                        var totalPages = parseInt(nav.getAttribute('data-total-pages'), 10) || 1;
-                        updatePaginationButtons(nav, page, totalPages);
+                    // Update active page button
+                    var totalPages = parseInt(nav.getAttribute('data-total-pages'), 10) || 1;
+                    updatePaginationButtons(nav, page, totalPages);
 
-                        // Scroll to top of grid
-                        wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
+                    // Scroll to top of grid
+                    wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                })
+                .catch(function () {
+                    // The page shown stays as it is, and says why nothing happened.
+                    showListingError(nav);
                 })
                 .finally(function () {
                     nav.style.opacity = '1';
@@ -354,45 +443,35 @@
 
             var observer = new IntersectionObserver(function (entries) {
                 if (!entries[0].isIntersecting || loading || !hasMore) return;
+                var failed = false;
+
                 loading = true;
                 if (spinner) spinner.style.display = 'inline';
 
-                var formData = new FormData();
-                formData.append('action', 'plugixa_recipe_load_recipes');
-                formData.append('nonce', nonce);
-                formData.append('page', page);
-                formData.append('config_key', configKey);
-
-                var ajaxUrl = (typeof plugixaRecipeConfig !== 'undefined' && plugixaRecipeConfig.ajaxUrl)
-                    ? plugixaRecipeConfig.ajaxUrl
-                    : (window.ajaxurl || '/wp-admin/admin-ajax.php');
-
-                fetch(ajaxUrl, { method: 'POST', body: formData, credentials: 'same-origin' })
-                .then(function (r) { return r.json(); })
+                loadListingPage(configKey, page, nonce)
                 .then(function (data) {
-                    if (data.success && data.data.html) {
-                        var temp = document.createElement('div');
-                        temp.innerHTML = data.data.html;
-                        var newItems = temp.querySelectorAll('.pxr-custom-grid__item, .pxr-custom-masonry__item, .pxr-custom-list__item');
-                        newItems.forEach(function (item) { grid.appendChild(item); });
-                        initVideoCards();
-                        page++;
+                    appendListingItems(grid, data.html);
+                    page++;
 
-                        if (!data.data.has_more) {
-                            hasMore = false;
-                            observer.disconnect();
-                            pagination.style.display = 'none';
-                        }
-                    } else {
+                    if (!data.has_more) {
                         hasMore = false;
                         observer.disconnect();
                         pagination.style.display = 'none';
                     }
                 })
-                .catch(function () { hasMore = false; observer.disconnect(); })
+                .catch(function () {
+                    // Stop asking, and leave the reason where the next recipes would be.
+                    failed = true;
+                    hasMore = false;
+                    observer.disconnect();
+                    if (spinner) {
+                        spinner.textContent = listingErrorText();
+                        spinner.style.display = 'inline';
+                    }
+                })
                 .finally(function () {
                     loading = false;
-                    if (spinner) spinner.style.display = 'none';
+                    if (spinner && !failed) spinner.style.display = 'none';
                 });
             }, { rootMargin: '200px' });
 
@@ -737,10 +816,7 @@
 
                 fetch(plugixaRecipeConfig.restUrl + 'favorites/' + recipeId, {
                     method: 'POST',
-                    headers: {
-                        'X-WP-Nonce': plugixaRecipeConfig.restNonce,
-                        'Content-Type': 'application/json'
-                    },
+                    headers: restHeaders({ 'Content-Type': 'application/json' }),
                     credentials: 'same-origin'
                 })
                 .then(function (response) { return response.json(); })
@@ -803,7 +879,7 @@
 
             fetch(plugixaRecipeConfig.restUrl + 'frontend/reviews/' + reviewId + '/helpful', {
                 method: 'POST',
-                headers: { 'X-WP-Nonce': plugixaRecipeConfig.restNonce },
+                headers: restHeaders(),
                 credentials: 'same-origin'
             })
             .then(function(r) { return r.json(); })
@@ -843,7 +919,7 @@
 
                 fetch(plugixaRecipeConfig.restUrl + 'frontend/recipes/' + recipeId + '/reviews?per_page=' + PER_PAGE + '&page=' + page, {
                     method: 'GET',
-                    headers: { 'X-WP-Nonce': plugixaRecipeConfig.restNonce },
+                    headers: restHeaders(),
                     credentials: 'same-origin'
                 })
                 .then(function (response) { return response.json(); })
@@ -1221,10 +1297,7 @@
 
             fetch(plugixaRecipeConfig.restUrl + 'frontend/likes/' + recipeId, {
                 method: 'POST',
-                headers: {
-                    'X-WP-Nonce': plugixaRecipeConfig.restNonce,
-                    'Content-Type': 'application/json'
-                },
+                headers: restHeaders({ 'Content-Type': 'application/json' }),
                 credentials: 'same-origin'
             })
             .then(function (response) { return response.json(); })
@@ -1281,10 +1354,7 @@
 
             fetch(plugixaRecipeConfig.restUrl + 'frontend/favorites/' + recipeId, {
                 method: 'POST',
-                headers: {
-                    'X-WP-Nonce': plugixaRecipeConfig.restNonce,
-                    'Content-Type': 'application/json'
-                },
+                headers: restHeaders({ 'Content-Type': 'application/json' }),
                 credentials: 'same-origin'
             })
             .then(function (response) { return response.json(); })

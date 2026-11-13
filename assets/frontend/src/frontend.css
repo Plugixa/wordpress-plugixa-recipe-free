@@ -6,5 +6,5 @@
 
 @import "tailwindcss/theme" prefix(pxr);
 @import "tailwindcss/utilities" prefix(pxr);
-@source "../../../templates";
+@source "../../../includes/Modules/*/views/**/*.php";
 @import "./custom.css";
