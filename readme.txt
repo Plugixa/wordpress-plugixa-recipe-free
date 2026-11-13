@@ -4,7 +4,7 @@ Tags: recipe, recipes, recipe card, nutrition, schema
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.4.0
+Stable tag: 1.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -242,6 +242,10 @@ WordPress oEmbed provider list: https://developer.wordpress.org/advanced-adminis
 
 == Changelog ==
 
+= 1.4.1 =
+* Changed: the settings section for the captcha is called "Spam protection" everywhere in the admin, and the hints that point at it use that name.
+* Tweaked: admin wording.
+
 = 1.4.0 =
 * Changed: collections and meal plans, shopping lists, recipe submissions (the `[plugixa_recipe_form]` form and "My recipes"), the nutrition calculator and the reader tools (unit conversion, step timers, cook mode, notes) are now part of Plugixa Recipe Pro. Nothing is deleted: your collections, lists, submitted recipes and settings stay in your database and come back as they were when Pro is active. Pages that hold one of these shortcodes show nothing in the meantime.
 * The servings adjuster on recipe pages, reviews, favourites, the nutrition label and the print view stay free.
@@ -315,6 +319,9 @@ WordPress oEmbed provider list: https://developer.wordpress.org/advanced-adminis
 * REST API and developer hooks
 
 == Upgrade Notice ==
+
+= 1.4.1 =
+Admin wording fixes. If you are still on 1.3.0, read the 1.4.0 notes: collections, meal plans, shopping lists, recipe submissions, the nutrition calculator and the reader tools moved to Pro, and your data is kept.
 
 = 1.4.0 =
 Collections, meal plans, shopping lists, recipe submissions, the nutrition calculator and the reader tools move to Pro. Your data is kept and returns when Pro is active. Also fixes an empty page served past the last page of an archive, and recipe page and listing styles that were never applied.

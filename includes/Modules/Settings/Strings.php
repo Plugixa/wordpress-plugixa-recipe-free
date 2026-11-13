@@ -34,6 +34,7 @@ final class Strings {
             'performance' => __('Performance', 'plugixa-recipe'),
             'api'         => __('API', 'plugixa-recipe'),
             'captcha'     => __('Captcha', 'plugixa-recipe'),
+            'spam_protection' => __('Spam protection', 'plugixa-recipe'),
             'notifications' => __('Notifications & uploads', 'plugixa-recipe'),
             'advanced'    => __('Advanced', 'plugixa-recipe'),
 
@@ -50,7 +51,7 @@ final class Strings {
             'settings_performance_hint' => __('Loading speed and caching.', 'plugixa-recipe'),
             'settings_api'              => __('API', 'plugixa-recipe'),
             'settings_api_hint'         => __('REST API access and rate limiting.', 'plugixa-recipe'),
-            'settings_captcha'          => __('Captcha', 'plugixa-recipe'),
+            'settings_captcha'          => __('Spam protection', 'plugixa-recipe'),
             'settings_captcha_hint'     => __('Cloudflare Turnstile credentials.', 'plugixa-recipe'),
             'settings_notifications'      => __('Notifications & uploads', 'plugixa-recipe'),
             'settings_notifications_hint' => __('What happens when a visitor sends you something.', 'plugixa-recipe'),

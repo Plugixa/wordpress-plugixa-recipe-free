@@ -1,0 +1,1 @@
+import"./rolldown-runtime-hePW80VL.js";import{Et as e,Tt as t}from"./Button-ErrbGwSD.js";import{K as n}from"./main-1hrCCM5Z.js";import{o as r,s as i}from"./formatters-na3Zof6v.js";e();var a=t(),o=({status:e,size:t=`small`,variant:o=`filled`})=>(0,a.jsx)(n,{label:i(e),color:r(e),size:t,variant:o});export{o as t};
