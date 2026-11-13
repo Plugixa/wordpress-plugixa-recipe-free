@@ -31,6 +31,7 @@ class ReviewsController extends RestController {
     public function __construct(ReviewService $reviews) {
         parent::__construct();
         $this->rest_base = 'reviews';
+        $this->entity_type = 'reviews';
         $this->reviews   = $reviews;
     }
 

@@ -211,28 +211,22 @@ class ArchivePage {
             return Templates::not_found( $template );
         }
 
-        $page     = max( 1, absint( get_query_var( 'plugixa_recipe_archive_page', 1 ) ) );
-        $per_page = 12;
+        $page = max( 1, absint( get_query_var( 'plugixa_recipe_archive_page', 1 ) ) );
+        $data = $this->data( $type, $taxonomy, $page );
 
-        // Count total recipes
-        $total = $this->repository->count_published( $type, (int) $taxonomy->id );
-        $total_pages = max( 1, (int) ceil( $total / $per_page ) );
-
-        // Query recipes for this page
-        $recipes = $this->repository->published_page( $type, (int) $taxonomy->id, $page, $per_page );
+        // A page past the last one names nothing: a 404, not "No recipes found" with a 200
+        // (a soft 404 that search engines index). Page 1 of a term with no recipe stays a
+        // page - the term exists and says so.
+        if ( $page > (int) $data['total_pages'] ) {
+            return Templates::not_found( $template );
+        }
 
         // Tell the JSON-LD builder exactly which recipes this page puts on screen, so the
         // structured data describes the visible content instead of guessing. This is a render
         // path that displays recipes as page content, so it MUST register - without this an
         // archive shows a full grid and emits no structured data at all. Note the set is the
         // paginated slice, not every recipe in the taxonomy. See PlugixaRecipe\Modules\Recipes\RenderedRecipes.
-        RenderedRecipes::add( $recipes );
-
-        // Enrich recipes for recipe-card.php
-        $enriched = [];
-        foreach ( $recipes as $recipe ) {
-            $enriched[] = $this->enrich_recipe_for_archive( (array) $recipe );
-        }
+        RenderedRecipes::add( $data['recipes'] );
 
         // Prevent 404
         global $wp_query;
@@ -286,11 +280,36 @@ class ArchivePage {
             \PlugixaRecipe\Core\Frontend\Assets::localize_config( plugixa_recipe_archive_url( $type, (string) $taxonomy->slug ) );
         }
 
-        // Build archive base URL for pagination
-        $archive_base = plugixa_recipe_url_slug( $type === 'cuisine' ? 'cuisine' : 'category' );
-
         // Pass data to template via globals (same pattern as SinglePage)
-        $GLOBALS['plugixa_recipe_archive_data'] = [
+        $GLOBALS['plugixa_recipe_archive_data'] = $data;
+
+        return plugixa_recipe_template( 'archive-wrapper.php' );
+    }
+
+    /**
+     * What archive.php (and any other layout of the archive page) draws: one page of a
+     * term's published recipes, enriched for recipe-card.php. Read-only: registers nothing,
+     * enqueues nothing, sends no header.
+     *
+     * @since 1.4.0
+     *
+     * @param string $type     'category' or 'cuisine'.
+     * @param object $taxonomy The term row (find_term()).
+     * @param int    $page     1-based page number.
+     * @return array<string, mixed> The shape of $GLOBALS['plugixa_recipe_archive_data'].
+     */
+    public function data( string $type, object $taxonomy, int $page ): array {
+        $per_page    = 12;
+        $total       = $this->repository->count_published( $type, (int) $taxonomy->id );
+        $total_pages = max( 1, (int) ceil( $total / $per_page ) );
+        $recipes     = $this->repository->published_page( $type, (int) $taxonomy->id, $page, $per_page );
+
+        $enriched = [];
+        foreach ( $recipes as $recipe ) {
+            $enriched[] = $this->enrich_recipe_for_archive( (array) $recipe );
+        }
+
+        return [
             'taxonomy'     => $taxonomy,
             'type'         => $type,
             'recipes'      => $enriched,
@@ -298,11 +317,14 @@ class ArchivePage {
             'total_pages'  => $total_pages,
             'total'        => $total,
             'per_page'     => $per_page,
-            'archive_base' => $archive_base,
+            'archive_base' => plugixa_recipe_url_slug( $type === 'cuisine' ? 'cuisine' : 'category' ),
             'view_config'  => $this->get_default_view_config(),
         ];
+    }
 
-        return plugixa_recipe_template( 'archive-wrapper.php' );
+    /** The term an archive URL names, or null. */
+    public function term( string $type, string $slug ): ?object {
+        return $this->repository->find_term( $type, $slug ) ?: null;
     }
 
     /**

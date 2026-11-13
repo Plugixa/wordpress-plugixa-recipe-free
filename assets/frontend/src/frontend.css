@@ -7,4 +7,8 @@
 @import "tailwindcss/theme" prefix(pxr);
 @import "tailwindcss/utilities" prefix(pxr);
 @source "../../../includes/Modules/*/views/**/*.php";
+/* Premium module views. Matches nothing in the free ZIP, which is correct there. */
+@source "../../../pro/includes/Modules/*/views/**/*.php";
+/* Premium block templates: their pxr: classes sit in block-comment JSON and in the markup. */
+@source "../../../pro/templates/**/*.html";
 @import "./custom.css";

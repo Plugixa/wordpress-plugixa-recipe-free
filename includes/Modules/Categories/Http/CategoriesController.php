@@ -28,6 +28,7 @@ class CategoriesController extends RestController {
     public function __construct(CategoryService $categories) {
         parent::__construct();
         $this->rest_base = 'categories';
+        $this->entity_type = 'categories';
         $this->categories  = $categories;
     }
 

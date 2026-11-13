@@ -4,15 +4,15 @@ Tags: recipe, recipes, recipe card, nutrition, schema
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.3.0
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-A modern recipe plugin with a React admin, multiple layouts, nutrition facts, reviews, collections, meal plans, and Recipe structured data for SEO.
+A modern recipe plugin with a React admin, multiple layouts, nutrition facts, reviews, favourites, and Recipe structured data for SEO.
 
 == Description ==
 
-🍳 Build beautiful, search-friendly recipe pages with **Plugixa Recipe** - a complete recipe manager with a fast React admin, four ready layouts, an FDA-style nutrition label, reviews, collections and meal plans.
+🍳 Build beautiful, search-friendly recipe pages with **Plugixa Recipe** - a complete recipe manager with a fast React admin, four ready layouts, an FDA-style nutrition label, reviews and favourites.
 
 📚 Read the [**Documentation**](https://www.plugixa.com/documentation/plugixa-recipe)
 🌐 Visit the official website [**Plugixa**](https://www.plugixa.com/)
@@ -51,14 +51,11 @@ Every layout ships with a polished **dark mode**, switchable per shortcode or fo
 * Two Gutenberg blocks (a recipe listing and a single recipe), plus 8 widget shortcodes (categories, cuisines, latest, popular, related, search, recipe of the day, count)
 * Put a whole recipe inside any post or page, with "Jump to recipe" and "Print recipe" buttons, or list several as a numbered round-up
 * 5-star reviews with photos and admin replies
-* Favourites, shopping lists, collections/cookbooks and meal plans
-* Pages for your visitors: their saved recipes, their shopping list and the recipes they sent you
-* Optional nutrition calculator using USDA FoodData Central and your own free API key
-* Reader tools on every recipe page - scale the servings, switch between metric and US units, copy the ingredients, run step timers and follow the method in cook mode
-* Frontend recipe submission with `[plugixa_recipe_form]`
-* Optional Cloudflare Turnstile captcha on the submission and review forms
+* Favourites, and a page for your visitors with the recipes they saved
+* A servings adjuster on every recipe page that scales the ingredient amounts
+* Optional Cloudflare Turnstile captcha on the review form
 * Automatic, filterable category and cuisine archive pages, and a search form that filters by course, difficulty, time and diet
-* Clean print view for every recipe, with the reader's servings and units and a choice of what to print
+* Clean print view for every recipe, with a choice of what to print
 * Recipe structured data (JSON-LD) for rich results, recipes in WordPress's own sitemap, plus Open Graph and Twitter Card meta
 * Font picker with locally-served fonts - no font CDN
 * Clean URLs: `/recipe/`, `/recipe-category/`, `/recipe-cuisine/`
@@ -82,9 +79,9 @@ Every layout ships with a polished **dark mode**, switchable per shortcode or fo
 
 Add up to 15 nutrients and a serving size, and the recipe page renders a proper FDA-style label - calories, fats, carbohydrates, protein, vitamins and minerals - with percent daily values. The same data feeds the Recipe structured data, so search engines read it too.
 
-= ⭐ Reviews, Favourites and Collections =
+= ⭐ Reviews and Favourites =
 
-Visitors can rate a recipe out of five, leave a review with photos, and mark recipes as favourites. Reviews are moderated from the admin and can be answered with an admin reply. Logged-in visitors keep their saved recipes and a shopping list on their own account page, and a visitor who is not logged in can still build a shopping list in their browser. You group recipes into collections (cookbooks) and meal plans in the admin.
+Visitors can rate a recipe out of five, leave a review with photos, and mark recipes as favourites. Reviews are moderated from the admin and can be answered with an admin reply. Logged-in visitors keep their saved recipes on their own account page.
 
 = 🔍 Recipe Schema for Google Rich Results =
 
@@ -93,10 +90,6 @@ Every recipe page outputs schema.org Recipe structured data (JSON-LD) - ingredie
 = 🎨 Customize Visually with Saved Views =
 
 A View is a reusable display design: layout, columns per breakpoint, colours, typography, spacing, image handling and category filters. Save as many as you like, then reference one from any shortcode or from the block - change the View and every placement updates.
-
-= 📝 Let Visitors Submit Their Own Recipes =
-
-Drop `[plugixa_recipe_form]` on a page and visitors can submit recipes with photos, straight into moderation. Protect it with your own Cloudflare Turnstile keys if you want a captcha.
 
 = 🌍 Multilingual and Translation Ready =
 
@@ -136,11 +129,8 @@ One whole recipe inside a post:
 A search form that filters the listing beside it:
 `[plugixa_recipe_search style="expanded"]`
 
-Your visitors' saved recipes, shopping list and submissions, as tabs:
+Your visitors' saved recipes:
 `[plugixa_recipe_account]`
-
-Frontend submission form:
-`[plugixa_recipe_form]`
 
 == Installation ==
 
@@ -188,10 +178,6 @@ Yes. Every recipe page carries schema.org Recipe structured data (JSON-LD), incl
 
 Yes. The shortcodes and block work with Gutenberg and major page builders, and an Elementor widget is included.
 
-= Q. Can visitors submit their own recipes? =
-
-Yes. Add the `[plugixa_recipe_form]` shortcode to any page. Submissions arrive for moderation, and you can protect the form with your own Cloudflare Turnstile keys.
-
 = Q. Does it support translations? =
 
 Yes. Plugixa Recipe is compatible with WPML and Polylang, including translatable categories and cuisines.
@@ -202,7 +188,7 @@ No. Recipe queries are served through the WordPress object cache, and the fonts 
 
 = Q. What is the difference between the free and Pro versions? =
 
-The free plugin is a complete recipe manager - all four layouts, Views, nutrition facts, reviews, collections, meal plans, frontend submission and Recipe structured data. Pro adds the AI Recipe Generator, custom fields, import and export (including from seven other recipe plugins), the SEO analyzer, demo content and WooCommerce integration. See the [Pro features](https://www.plugixa.com/plugins/plugixa-recipe#pricing).
+The free plugin is a complete recipe manager - all four layouts, Views, nutrition facts, reviews, favourites, a servings adjuster and Recipe structured data. Pro adds the AI Recipe Generator, custom fields, import and export (including from seven other recipe plugins), the SEO analyzer, collections and meal plans, shopping lists, recipe submissions from visitors, nutrition calculated from the ingredients, reader tools (unit conversion, step timers and cook mode), demo content and WooCommerce integration. See the [Pro features](https://www.plugixa.com/plugins/plugixa-recipe#pricing).
 
 = Q. Where can I find the documentation? =
 
@@ -212,7 +198,7 @@ Full documentation - installation, shortcode reference, layouts and Views, nutri
 
 This plugin connects to the third-party services listed below. Apart from Freemius, every connection is optional: it is made only when a site administrator turns the relevant feature on.
 
-The only services this plugin contacts are Freemius, Cloudflare Turnstile (optional, and only with your own keys), USDA FoodData Central (optional, and only with your own key) and - if you add a video URL to a recipe - the video host's oEmbed endpoint.
+The only services this plugin contacts are Freemius, Cloudflare Turnstile (optional, and only with your own keys) and - if you add a video URL to a recipe - the video host's oEmbed endpoint.
 
 = Freemius =
 
@@ -221,13 +207,8 @@ Provided by Freemius, Inc. - Terms: https://freemius.com/terms/ - Privacy: https
 
 = Cloudflare Turnstile (optional) =
 
-If you enable the captcha for the frontend recipe submission form and/or the review form and enter your own Turnstile site and secret keys, the plugin loads the Turnstile widget on those forms and verifies each submission with Cloudflare. The visitor's browser loads the widget script from Cloudflare, and when the visitor submits a protected form your server sends the Turnstile token and the visitor's IP address to Cloudflare to be checked. It is disabled by default and requires your own Turnstile keys; with the captcha switched off, no request is made and the script is not loaded.
+If you enable the captcha for the review form and enter your own Turnstile site and secret keys, the plugin loads the Turnstile widget on that form and verifies each review with Cloudflare. The visitor's browser loads the widget script from Cloudflare, and when the visitor submits a protected form your server sends the Turnstile token and the visitor's IP address to Cloudflare to be checked. It is disabled by default and requires your own Turnstile keys; with the captcha switched off, no request is made and the script is not loaded.
 Provided by Cloudflare, Inc. - Service: https://www.cloudflare.com/application-services/products/turnstile/ - Terms: https://www.cloudflare.com/website-terms/ - Privacy: https://www.cloudflare.com/privacypolicy/
-
-= USDA FoodData Central (optional) =
-
-The Nutrition Calculator app is switched off by default. If you switch it on and enter your own FoodData Central API key, then each time you press "Calculate from ingredients" in the recipe editor your server sends the names of that recipe's ingredients (for example "flour"), together with your API key, to api.nal.usda.gov and receives matching foods with their nutrient values. Nothing is sent at any other time, and nothing about your visitors, your site or the rest of the recipe is sent. Answers are kept on your site for a week, and the foods you confirm are remembered, so the same ingredient is not asked for again.
-Provided by the U.S. Department of Agriculture, Agricultural Research Service - Service: https://fdc.nal.usda.gov/ - API guide and terms: https://fdc.nal.usda.gov/api-guide - Privacy: https://www.usda.gov/privacy-policy
 
 = Video hosts via oEmbed (optional) =
 
@@ -260,6 +241,14 @@ WordPress oEmbed provider list: https://developer.wordpress.org/advanced-adminis
 18. Single-recipe pages and swipeable sliders stay smooth all the way down to mobile
 
 == Changelog ==
+
+= 1.4.0 =
+* Changed: collections and meal plans, shopping lists, recipe submissions (the `[plugixa_recipe_form]` form and "My recipes"), the nutrition calculator and the reader tools (unit conversion, step timers, cook mode, notes) are now part of Plugixa Recipe Pro. Nothing is deleted: your collections, lists, submitted recipes and settings stay in your database and come back as they were when Pro is active. Pages that hold one of these shortcodes show nothing in the meantime.
+* The servings adjuster on recipe pages, reviews, favourites, the nutrition label and the print view stay free.
+* New: Settings > Notifications & uploads holds the moderation email and the largest photo a visitor may upload.
+* Fixed: a category or cuisine page number past the last page answers "not found" (404) instead of an empty page that search engines could index.
+* Fixed: the rating summary on a recipe page sits beside its bars on wide screens, recipe cards in listings lift on hover, and review photos respond to the pointer - these styles were written in a form the stylesheet never compiled.
+* Developers: the recipe page template is built from parts in `views/single/` and the archive from `views/archive/`, so a child theme or add-on can reuse one part instead of copying the whole page.
 
 = 1.2.0 =
 * New: Recipe structured data (JSON-LD) is part of this plugin. Recipe pages describe their steps in sections, with equipment, diets and breadcrumbs; listings and archives describe a list of the recipes they show.
@@ -326,6 +315,9 @@ WordPress oEmbed provider list: https://developer.wordpress.org/advanced-adminis
 * REST API and developer hooks
 
 == Upgrade Notice ==
+
+= 1.4.0 =
+Collections, meal plans, shopping lists, recipe submissions, the nutrition calculator and the reader tools move to Pro. Your data is kept and returns when Pro is active. Also fixes an empty page served past the last page of an archive, and recipe page and listing styles that were never applied.
 
 = 1.2.0 =
 A large release: recipe structured data, a new recipe editor, reader tools, recipes inside posts and visitor pages. Publishing recipes and moderating reviews now need the publish capability. Recommended for every site.

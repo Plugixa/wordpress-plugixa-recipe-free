@@ -28,6 +28,7 @@ class ShortcodesController extends RestController {
     public function __construct(ShortcodeService $shortcodes) {
         parent::__construct();
         $this->rest_base  = 'shortcodes';
+        $this->entity_type = 'shortcodes';
         $this->shortcodes = $shortcodes;
     }
 

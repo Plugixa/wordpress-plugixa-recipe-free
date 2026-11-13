@@ -13,14 +13,56 @@ use WP_REST_Controller;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_Error;
+use PlugixaRecipe\Core\Security\Capabilities;
 
 /**
  * Base REST Controller
  */
 abstract class RestController extends WP_REST_Controller {
 
+    /**
+     * The entity this controller's routes act on, as Capabilities::user_can() names it
+     * (recipes, reviews, collections, ...). Empty = not an owned entity.
+     */
+    protected string $entity_type = '';
+
     public function __construct() {
         $this->namespace = 'plugixa-recipe/v1';
+    }
+
+    /**
+     * The record a request acts on, so a `plugixa_recipe_user_can` listener can judge whose
+     * it is: `['id' => n]` for a route that names one, null for a list or a create.
+     *
+     * The id is read with `get_param('id')`, the SAME expression the handlers use (it prefers
+     * a body `id` over the URL's - a check that read the URL would judge one record while the
+     * handler wrote another). Only the id is passed: the listener looks the owner up itself,
+     * so a controller needs no loader and a check costs no query when nothing listens.
+     *
+     * @param WP_REST_Request $request
+     * @return array<string, mixed>|null
+     */
+    protected function record_for($request): ?array {
+        $id = (int) $request->get_param('id');
+
+        return $id > 0 ? ['id' => $id] : null;
+    }
+
+    /**
+     * The one permission question: Capabilities::user_can() for this controller's entity.
+     *
+     * The record is loaded only when something listens on `plugixa_recipe_user_can`; with
+     * nothing there the answer cannot depend on it, and a permission check must not cost
+     * every request a query it does not need.
+     *
+     * @param WP_REST_Request $request
+     */
+    protected function allowed(string $action, $request): bool {
+        $record = has_filter('plugixa_recipe_user_can') && $request instanceof WP_REST_Request
+            ? $this->record_for($request)
+            : null;
+
+        return Capabilities::user_can($action, $this->entity_type, $record);
     }
 
     /**
@@ -51,7 +93,7 @@ abstract class RestController extends WP_REST_Controller {
      * @return bool|WP_Error
      */
     public function check_read_permission($request) {
-        return $this->can('plugixa_recipe_manage', 'edit_posts')
+        return $this->allowed('read', $request)
             ? true
             : $this->forbidden(__('You do not have permission to view this content.', 'plugixa-recipe'));
     }
@@ -63,7 +105,16 @@ abstract class RestController extends WP_REST_Controller {
      * @return bool|WP_Error
      */
     public function check_edit_permission($request) {
-        return $this->can('plugixa_recipe_edit', 'edit_posts')
+        // A create is a POST to the collection itself (`/recipes`); a POST anywhere below it
+        // (`/recipes/bulk-action`, `/recipes/reorder`, `/recipes/5/duplicate`) works on
+        // records that already exist, so it is an edit.
+        $action = $request instanceof WP_REST_Request
+            && 'POST' === $request->get_method()
+            && untrailingslashit($request->get_route()) === '/' . $this->namespace . '/' . $this->rest_base
+            ? 'create'
+            : 'edit';
+
+        return $this->allowed($action, $request)
             ? true
             : $this->forbidden(__('You do not have permission to edit this content.', 'plugixa-recipe'));
     }
@@ -101,7 +152,7 @@ abstract class RestController extends WP_REST_Controller {
      * plugixa_recipe_delete still passes regardless of role.
      */
     public function check_delete_permission($request) {
-        return $this->can('plugixa_recipe_delete', 'delete_published_posts')
+        return $this->allowed('delete', $request)
             ? true
             : $this->forbidden(__('You do not have permission to delete this content.', 'plugixa-recipe'));
     }
@@ -129,7 +180,7 @@ abstract class RestController extends WP_REST_Controller {
      * @return bool|WP_Error
      */
     public function check_publish_permission($request) {
-        return $this->can('plugixa_recipe_publish', 'publish_posts')
+        return $this->allowed('publish', $request)
             ? true
             : $this->forbidden(__('You do not have permission to publish or moderate this content.', 'plugixa-recipe'));
     }
@@ -141,7 +192,7 @@ abstract class RestController extends WP_REST_Controller {
      * @return bool|WP_Error
      */
     public function check_settings_permission($request) {
-        return $this->can('plugixa_recipe_settings', 'manage_options')
+        return $this->allowed('settings', $request)
             ? true
             : $this->forbidden(__('Administrator access required.', 'plugixa-recipe'));
     }

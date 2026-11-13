@@ -116,16 +116,20 @@ final class DashboardStatsRepository extends Repository {
      *
      * @return array<int, array<string, mixed>>|null
      */
-    public function recent_recipes() {
+    public function recent_recipes(int $owner = 0) {
         global $wpdb;
 
+        // Owner gate: 0 = everybody's (Capabilities::owner_scope()).
         return $wpdb->get_results(
             $wpdb->prepare(
                 'SELECT id, title, status, difficulty, rating_average, created_at, image_id
                 FROM %i
+                WHERE ( %d = 0 OR created_by = %d )
                 ORDER BY created_at DESC, id DESC
                 LIMIT 5',
-                $this->table('recipes')
+                $this->table('recipes'),
+                $owner,
+                $owner
             ),
             ARRAY_A
         );
@@ -170,18 +174,22 @@ final class DashboardStatsRepository extends Repository {
      *
      * @return array<int, array<string, mixed>>|null
      */
-    public function recent_reviews() {
+    public function recent_reviews(int $owner = 0) {
         global $wpdb;
 
+        // Owner gate: only reviews of recipes this user created (0 = every review).
         return $wpdb->get_results(
             $wpdb->prepare(
                 'SELECT r.id, r.rating, r.review_text, r.author_name, r.status, r.created_at, rec.title AS recipe_title
                 FROM %i r
                 LEFT JOIN %i rec ON r.recipe_id = rec.id
+                WHERE ( %d = 0 OR rec.created_by = %d )
                 ORDER BY r.created_at DESC, r.id DESC
                 LIMIT 5',
                 $this->table('reviews'),
-                $this->table('recipes')
+                $this->table('recipes'),
+                $owner,
+                $owner
             ),
             ARRAY_A
         );

@@ -41,7 +41,8 @@ class Admin {
         add_menu_page(
             __('Plugixa Recipe', 'plugixa-recipe'),
             __('Plugixa Recipe', 'plugixa-recipe'),
-            'edit_posts',
+            // Derived at runtime from edit_posts, plus any add-on grant: Capabilities::has_cap().
+            \PlugixaRecipe\Core\Security\Capabilities::MANAGE,
             self::SLUG,
             [$this, 'render_app'],
             'dashicons-food',

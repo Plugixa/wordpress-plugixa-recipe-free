@@ -29,6 +29,7 @@ class SettingsController extends RestController {
     public function __construct(SettingsService $settings) {
         parent::__construct();
         $this->rest_base = 'settings';
+        $this->entity_type = 'settings';
         $this->settings  = $settings;
     }
 

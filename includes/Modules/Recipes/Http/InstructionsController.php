@@ -30,6 +30,7 @@ class InstructionsController extends RestController {
     public function __construct(InstructionService $instructions) {
         parent::__construct();
         $this->rest_base    = 'recipes';
+        $this->entity_type = 'recipes';
         $this->instructions = $instructions;
     }
 

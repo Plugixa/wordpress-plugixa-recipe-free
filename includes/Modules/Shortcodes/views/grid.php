@@ -203,7 +203,7 @@ $cat_display_style = $view_config['categories']['displayStyle'] ?? 'none';
                     }, $recipe->cuisines );
                 }
             ?>
-                <div class="pxr-custom-grid__item pxr:rounded-lg pxr:overflow-hidden pxr:shadow-sm pxr:transition-shadow pxr:duration-200 hover:pxr:shadow-md"
+                <div class="pxr-custom-grid__item pxr:rounded-lg pxr:overflow-hidden pxr:shadow-sm pxr:transition-shadow pxr:duration-200 pxr:hover:shadow-md"
                      role="listitem"
                      <?php if ( ! empty( $cat_slugs ) ) : ?>
                          data-pxr-categories="<?php echo esc_attr( implode( ',', $cat_slugs ) ); ?>"

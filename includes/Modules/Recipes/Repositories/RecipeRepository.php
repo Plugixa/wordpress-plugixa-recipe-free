@@ -44,7 +44,8 @@ final class RecipeRepository extends Repository {
      *                                       text or ''), status_gate, status, category_id,
      *                                       uncategorized, cuisine_id, course_id, difficulty,
      *                                       has_featured, featured, min_rating, diet (the six
-     *                                       gate/value pairs, in column order).
+     *                                       gate/value pairs, in column order), owner (0 or
+     *                                       the only user whose recipes may be listed).
      * @return array<int, mixed>
      */
     private function filter_args(array $criteria): array {
@@ -73,7 +74,11 @@ final class RecipeRepository extends Repository {
             $difficulty !== '' ? 1 : 0, $difficulty,
             $criteria['has_featured'] ? 1 : 0, $criteria['featured'],
             $min_rating > 0 ? 1 : 0, $min_rating,
-        ], $criteria['diet']);
+        ], $criteria['diet'], [
+            // Owner gate: 0 lists every recipe; a user id lists only that user's
+            // (Capabilities::owner_scope(), which only an add-on ever sets).
+            (int) ($criteria['owner'] ?? 0), (int) ($criteria['owner'] ?? 0),
+        ]);
     }
 
     /**
@@ -117,7 +122,8 @@ final class RecipeRepository extends Repository {
         AND ( %d = 0 OR r.is_gluten_free = %d )
         AND ( %d = 0 OR r.is_dairy_free = %d )
         AND ( %d = 0 OR r.is_keto = %d )
-        AND ( %d = 0 OR r.is_low_carb = %d )',
+        AND ( %d = 0 OR r.is_low_carb = %d )
+        AND ( %d = 0 OR r.created_by = %d )',
                 ...$filter_args
             ));
         });
@@ -164,6 +170,7 @@ final class RecipeRepository extends Repository {
         AND ( %d = 0 OR r.is_dairy_free = %d )
         AND ( %d = 0 OR r.is_keto = %d )
         AND ( %d = 0 OR r.is_low_carb = %d )
+        AND ( %d = 0 OR r.created_by = %d )
                       ORDER BY r.%i ASC, r.id ASC
                       LIMIT %d OFFSET %d',
                     ...$args
@@ -186,6 +193,7 @@ final class RecipeRepository extends Repository {
         AND ( %d = 0 OR r.is_dairy_free = %d )
         AND ( %d = 0 OR r.is_keto = %d )
         AND ( %d = 0 OR r.is_low_carb = %d )
+        AND ( %d = 0 OR r.created_by = %d )
                       ORDER BY r.%i DESC, r.id DESC
                       LIMIT %d OFFSET %d',
                 ...$args
@@ -230,6 +238,23 @@ final class RecipeRepository extends Repository {
         global $wpdb;
 
         return (bool) $wpdb->get_var($wpdb->prepare('SELECT id FROM %i WHERE id = %d', $this->table('recipes'), $id));
+    }
+
+    /**
+     * Of these recipe ids, the ones a given user created. Uncached: it guards a write.
+     *
+     * @param string $id_list Comma-separated integer ids (bound as ONE value, FIND_IN_SET).
+     * @return int[]
+     */
+    public function owned_ids(string $id_list, int $owner): array {
+        global $wpdb;
+
+        return array_map('intval', (array) $wpdb->get_col($wpdb->prepare(
+            'SELECT id FROM %i WHERE FIND_IN_SET(id, %s) AND created_by = %d ORDER BY id ASC',
+            $this->table('recipes'),
+            $id_list,
+            $owner
+        )));
     }
 
     /**
@@ -666,13 +691,6 @@ final class RecipeRepository extends Repository {
         $wpdb->delete($this->table('reviews'), ['recipe_id' => $id]);
         $wpdb->delete($this->table('favorites'), ['recipe_id' => $id]);
         $wpdb->delete($this->table('likes'), ['recipe_id' => $id]);
-        $wpdb->delete($this->table('collection_recipes'), ['recipe_id' => $id]);
-
-        // Shopping-list items belong to the shopper, not the recipe: detach, never delete.
-        // The list reads the recipe through a LEFT JOIN, so the item stays and only loses its
-        // recipe title. Left dangling instead, the id could show ANOTHER recipe's title on a
-        // server that hands a deleted id out again (InnoDB before MySQL 8, after a restart).
-        $wpdb->update($this->table('shopping_list_items'), ['recipe_id' => null], ['recipe_id' => $id]);
     }
 
     /**
@@ -684,10 +702,10 @@ final class RecipeRepository extends Repository {
 
         $wpdb->delete($this->table('recipes'), ['id' => $id]);
 
-        // Recipe + pivot rows gone (category/cuisine/course counts change), the recipe's
-        // reviews, favorites and collection links were removed above, and any shopping-list
-        // item that pointed at it was detached.
-        $this->flush('reviews', 'favorites', 'collections', 'shopping_lists');
+        // Recipe + pivot rows gone (category/cuisine/course counts change), and the recipe's
+        // reviews and favorites were removed above. A module that owns rows keyed by recipe
+        // acts on them from plugixa_recipe_delete_recipe and flushes its own.
+        $this->flush('reviews', 'favorites');
     }
 
     /**
@@ -697,7 +715,7 @@ final class RecipeRepository extends Repository {
      * @return string[] Table names, without the plugin prefix.
      */
     public function child_tables(): array {
-        return ['recipe_categories', 'recipe_cuisines', 'recipe_courses', 'ingredients', 'instructions', 'nutrition', 'reviews', 'favorites', 'likes', 'collection_recipes'];
+        return ['recipe_categories', 'recipe_cuisines', 'recipe_courses', 'ingredients', 'instructions', 'nutrition', 'reviews', 'favorites', 'likes'];
     }
 
     /**
@@ -731,23 +749,16 @@ final class RecipeRepository extends Repository {
             ));
         }
 
-        // Detach shopping-list items rather than delete them - see delete_cascade().
-        $wpdb->query($wpdb->prepare(
-            'UPDATE %i SET recipe_id = NULL WHERE FIND_IN_SET(recipe_id, %s)',
-            $this->table('shopping_list_items'),
-            $id_list
-        ));
-
         $deleted = $wpdb->query($wpdb->prepare(
             'DELETE FROM %i WHERE FIND_IN_SET(id, %s)',
             $this->table('recipes'),
             $id_list
         ));
 
-        // Recipes + pivot rows gone (category/cuisine/course counts change), the deleted
-        // recipes' reviews, favorites and collection links were removed above, and their
-        // shopping-list items were detached.
-        $this->flush('reviews', 'favorites', 'collections', 'shopping_lists');
+        // Recipes + pivot rows gone (category/cuisine/course counts change), and the deleted
+        // recipes' reviews and favorites were removed above. A module that owns rows keyed
+        // by recipe acts on them from plugixa_recipe_delete_recipes and flushes its own.
+        $this->flush('reviews', 'favorites');
 
         return $deleted;
     }

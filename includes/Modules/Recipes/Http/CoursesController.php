@@ -28,6 +28,7 @@ class CoursesController extends RestController {
     public function __construct(CourseService $courses) {
         parent::__construct();
         $this->rest_base = 'courses';
+        $this->entity_type = 'courses';
         $this->courses   = $courses;
     }
 

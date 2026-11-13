@@ -29,6 +29,7 @@ class FavoritesController extends RestController {
     public function __construct(FavoriteService $favorites) {
         parent::__construct();
         $this->rest_base = 'favorites';
+        $this->entity_type = 'favorites';
         $this->favorites = $favorites;
     }
 

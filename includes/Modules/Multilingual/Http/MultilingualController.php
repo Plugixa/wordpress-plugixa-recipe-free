@@ -29,6 +29,7 @@ class MultilingualController extends RestController {
     public function __construct(TranslationService $translations) {
         parent::__construct();
         $this->rest_base    = 'multilingual';
+        $this->entity_type = 'translations';
         $this->translations = $translations;
     }
 

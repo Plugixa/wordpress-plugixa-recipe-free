@@ -11,6 +11,7 @@ defined( 'ABSPATH' ) || exit;
 
 use PlugixaRecipe\Core\Admin\Admin;
 use PlugixaRecipe\Core\Modules\ModuleRegistry;
+use PlugixaRecipe\Core\Security\Capabilities;
 
 /**
  * Main Plugin Class - Singleton pattern
@@ -54,6 +55,9 @@ class Plugin {
         // No load_plugin_textdomain(): since WP 4.6 translations for WordPress.org-hosted
         // plugins are loaded just-in-time, so calling it is redundant (and Plugin Check
         // flags it). The Domain Path header is likewise dropped.
+
+        // Derives plugixa_recipe_manage ("may open the app") at runtime; see Capabilities.
+        Capabilities::register_hooks();
 
         if (is_admin()) {
             $admin = new Admin();

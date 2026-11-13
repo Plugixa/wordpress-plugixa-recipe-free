@@ -30,6 +30,7 @@ class NutritionController extends RestController {
     public function __construct(NutritionService $nutrition) {
         parent::__construct();
         $this->rest_base = 'recipes';
+        $this->entity_type = 'recipes';
         $this->nutrition = $nutrition;
     }
 

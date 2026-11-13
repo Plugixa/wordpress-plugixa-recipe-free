@@ -28,6 +28,7 @@ class ViewsController extends RestController {
     public function __construct(ViewService $views) {
         parent::__construct();
         $this->rest_base = 'views';
+        $this->entity_type = 'views';
         $this->views     = $views;
     }
 

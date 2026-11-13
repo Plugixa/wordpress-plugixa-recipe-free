@@ -101,7 +101,7 @@ if ( ! $allow_guests && ! $is_logged_in ) {
                  aria-label="<?php esc_attr_e( 'Select rating', 'plugixa-recipe' ); ?>">
                 <?php for ( $i = 1; $i <= 5; $i++ ) : ?>
                     <button type="button"
-                            class="pxr-custom-review-star pxr:w-8 pxr:h-8 pxr:border-0 pxr:bg-transparent pxr:cursor-pointer pxr:p-0 pxr:transition-transform pxr:duration-100 hover:pxr:scale-110"
+                            class="pxr-custom-review-star pxr:w-8 pxr:h-8 pxr:border-0 pxr:bg-transparent pxr:cursor-pointer pxr:p-0 pxr:transition-transform pxr:duration-100 pxr:hover:scale-110"
                             data-pxr-star-value="<?php echo esc_attr( $i ); ?>"
                             role="radio"
                             aria-checked="false"
@@ -194,7 +194,7 @@ if ( ! $allow_guests && ! $is_logged_in ) {
                     </span>
                 </label>
                 <div class="pxr-review-images-preview pxr:flex pxr:flex-wrap pxr:gap-2 pxr:mb-2" data-pxr-review-images-preview></div>
-                <label class="pxr-review-images-trigger pxr:inline-flex pxr:items-center pxr:gap-2 pxr:px-4 pxr:py-2 pxr:border pxr:border-dashed pxr:rounded-lg pxr:text-sm pxr:cursor-pointer pxr:transition-colors pxr:duration-200 hover:pxr:border-current"
+                <label class="pxr-review-images-trigger pxr:inline-flex pxr:items-center pxr:gap-2 pxr:px-4 pxr:py-2 pxr:border pxr:border-dashed pxr:rounded-lg pxr:text-sm pxr:cursor-pointer pxr:transition-colors pxr:duration-200 pxr:hover:border-current"
                        data-pxr-review-images-trigger>
                     <svg class="pxr:w-4 pxr:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />

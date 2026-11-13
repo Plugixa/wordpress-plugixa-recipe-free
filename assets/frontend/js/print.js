@@ -42,7 +42,7 @@
         var tools = window.PlugixaRecipeTools;
         if (!tools || !tools.present || !tools.readLine) return;
 
-        // The same key, and the same limits, as recipe-tools.js.
+        // The same key, and the same limits, as the reader tools' script.
         var stored = readStore('pxr-recipe-tools-' + (root.getAttribute('data-pxr-recipe-id') || ''));
         if (!stored) return;
 

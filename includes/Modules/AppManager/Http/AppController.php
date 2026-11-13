@@ -25,6 +25,7 @@ class AppController extends RestController {
     public function __construct() {
         parent::__construct();
         $this->rest_base = 'apps';
+        $this->entity_type = 'settings';
     }
 
     public function register_routes(): void {

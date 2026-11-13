@@ -13,8 +13,8 @@ use PlugixaRecipe\Modules\Account\Http\AccountController;
 defined('ABSPATH') || exit;
 
 /**
- * A visitor's own corner of the site: the recipes they saved, the recipes they sent in,
- * and a shopping list.
+ * A visitor's own corner of the site: the recipes they saved. Another module can add a
+ * page to it (plugixa_recipe_account_tabs) and draw it the same way (AccountPages::page()).
  *
  * The pages are shells that are the same for everyone, so a page cache can keep them; the
  * script on them asks who is looking and fetches that person's rows. Every route here
@@ -39,7 +39,7 @@ final class Module extends AbstractModule {
     public function labels(): array {
         return [
             'label'       => __('Visitor Account', 'plugixa-recipe'),
-            'description' => __('Pages for your visitors: their saved recipes, the recipes they submitted, and a shopping list that also works without logging in.', 'plugixa-recipe'),
+            'description' => __('A page for your visitors with the recipes they saved, which a page cache can serve to everyone.', 'plugixa-recipe'),
         ];
     }
 

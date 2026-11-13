@@ -9,6 +9,7 @@ use PlugixaRecipe\Core\Http\Failure;
 use PlugixaRecipe\Modules\Recipes\Enums;
 use PlugixaRecipe\Modules\Recipes\Repositories\RecipeChildRepository;
 use PlugixaRecipe\Modules\Recipes\Repositories\RecipeRepository;
+use PlugixaRecipe\Core\Security\Capabilities;
 use WP_Error;
 
 defined('ABSPATH') || exit;
@@ -121,6 +122,7 @@ final class RecipeService {
             'featured'      => $featured_val,
             'min_rating'    => $min_rating,
             'diet'          => $diet_args,
+            'owner'         => Capabilities::owner_scope('recipes'),
         ];
 
         $total   = $this->recipes->count($criteria);
@@ -648,6 +650,27 @@ final class RecipeService {
             $data['published_at'] = $now;
         }
 
+        // A live recipe that stays live, edited by someone whose changes must be reviewed,
+        // goes back to moderation. Nothing in the free build says "must be reviewed": a
+        // permission add-on answers that (a member who may edit their own recipes but not
+        // publish). The edit and the status change are one write, so an unreviewed change is
+        // never public.
+        $stays_live = self::LIVE === $existing['status'] && (!isset($data['status']) || self::LIVE === $data['status']);
+
+        /**
+         * Whether this edit of a published recipe must go back to moderation.
+         *
+         * @since 1.4.0
+         *
+         * @param bool  $requires_review Default false.
+         * @param array $existing        The stored recipe row.
+         * @param mixed $params          The payload.
+         * @param int   $user_id         The editor.
+         */
+        if ($stays_live && apply_filters('plugixa_recipe_edit_requires_review', false, $existing, $params, get_current_user_id())) {
+            $data['status'] = 'pending';
+        }
+
         // Normalize slug: always slug-sanitized, falling back to the (new or
         // existing) title when cleared so a recipe never loses its permalink.
         if (isset($data['slug'])) {
@@ -718,8 +741,8 @@ final class RecipeService {
             return Failure::make(__('Recipe not found.', 'plugixa-recipe'), 404);
         }
 
-        // Everything keyed to the recipe goes first (shopping-list items are detached, not
-        // deleted); the recipe row itself is still there when the action below fires.
+        // Everything keyed to the recipe goes first; the recipe row itself is still there
+        // when the action below fires, for a module to remove or detach its own rows.
         $this->recipes->delete_cascade($id);
 
         /**
@@ -850,9 +873,33 @@ final class RecipeService {
             return Failure::make(__('Items are required.', 'plugixa-recipe'));
         }
 
+        // An owner-scoped user reorders only their own recipes.
+        $owned = $this->in_scope(array_map(static fn($i) => (int) (is_array($i) ? ($i['id'] ?? 0) : 0), $items));
+        $items = array_values(array_filter($items, static fn($i) => is_array($i) && in_array((int) ($i['id'] ?? 0), $owned, true)));
+
         $this->recipes->reorder($items, $category_id);
 
         return true;
+    }
+
+    /**
+     * The ids a bulk write may touch: all of them, or - when the current user's list is
+     * scoped to their own recipes (Capabilities::owner_scope()) - only the ones they created.
+     * A bulk route takes its ids from the body, so the per-record permission check cannot
+     * see them; this is where they are judged.
+     *
+     * @param int[] $ids
+     * @return int[]
+     */
+    private function in_scope(array $ids): array {
+        $ids   = array_values(array_filter($ids, static fn($id) => $id > 0));
+        $owner = Capabilities::owner_scope('recipes');
+
+        if (0 === $owner || empty($ids)) {
+            return $ids;
+        }
+
+        return $this->recipes->owned_ids(implode(',', $ids), $owner);
     }
 
     /**
@@ -863,7 +910,7 @@ final class RecipeService {
      */
     public function delete_many($params) {
         $ids    = $params['ids'] ?? [];
-        $ids    = array_map('intval', is_array($ids) ? $ids : []);
+        $ids    = $this->in_scope(array_map('intval', is_array($ids) ? $ids : []));
 
         if (empty($ids)) {
             return Failure::make(__('No IDs provided.', 'plugixa-recipe'));
@@ -888,6 +935,19 @@ final class RecipeService {
         // $ids is already array_map('intval', ...) at the top of this method.
         $id_list = implode(',', $ids);
 
+        /**
+         * Fires before a BULK delete removes anything, while every id is still valid.
+         *
+         * The bulk twin of plugixa_recipe_delete_recipe, which the bulk route never fires.
+         * A module that owns rows keyed by recipe acts on its own rows here - detaches
+         * them, or deletes them and flushes its own cache - so the free cascade names no
+         * table it does not create.
+         *
+         * @since 1.4.0
+         * @param int[] $ids
+         */
+        do_action('plugixa_recipe_delete_recipes', $ids);
+
         return $this->recipes->delete_many_cascade($tables, $id_list);
     }
 
@@ -899,7 +959,7 @@ final class RecipeService {
      */
     public function bulk_action($params) {
         $ids    = $params['ids'] ?? [];
-        $ids    = array_map('intval', is_array($ids) ? $ids : []);
+        $ids    = $this->in_scope(array_map('intval', is_array($ids) ? $ids : []));
         $action = sanitize_text_field($params['action'] ?? '');
 
         if (empty($ids) || empty($action)) {

@@ -6,6 +6,7 @@
 namespace PlugixaRecipe\Modules\Reviews\Services;
 
 use PlugixaRecipe\Core\Http\Failure;
+use PlugixaRecipe\Core\Security\Capabilities;
 use PlugixaRecipe\Modules\Reviews\Repositories\ReviewRepository;
 use WP_Error;
 
@@ -63,8 +64,11 @@ final class ReviewService {
         $orderby = in_array($sort['orderby'], self::SORTABLE) ? $sort['orderby'] : 'created_at';
         $order   = $sort['order'] === 'ASC' ? 'ASC' : 'DESC';
 
-        $total = $this->reviews->count($search, $status, $recipe_id, $rating, $min_rating);
-        $items = $this->reviews->page($search, $status, $recipe_id, $rating, $min_rating, $orderby, $order, $pagination['limit'], $pagination['offset']);
+        // 0, or the only user whose recipes' reviews may be listed (Capabilities::owner_scope()).
+        $owner = Capabilities::owner_scope('reviews');
+
+        $total = $this->reviews->count($search, $status, $recipe_id, $rating, $min_rating, $owner);
+        $items = $this->reviews->page($search, $status, $recipe_id, $rating, $min_rating, $orderby, $order, $pagination['limit'], $pagination['offset'], $owner);
 
         foreach ($items as &$item) {
             $item = $this->decorate($item);
@@ -239,13 +243,31 @@ final class ReviewService {
     }
 
     /**
+     * The review ids a bulk write may touch: all, or - for a user scoped to their own
+     * recipes (Capabilities::owner_scope()) - only reviews of recipes they created.
+     *
+     * @param int[] $ids
+     * @return int[]
+     */
+    private function in_scope(array $ids): array {
+        $ids   = array_values(array_filter($ids, static fn($id) => $id > 0));
+        $owner = Capabilities::owner_scope('reviews');
+
+        if (0 === $owner || empty($ids)) {
+            return $ids;
+        }
+
+        return $this->reviews->owned_ids(implode(',', $ids), $owner);
+    }
+
+    /**
      * Bulk delete reviews.
      *
      * @param mixed $ids Raw payload value.
      * @return int|false|WP_Error Rows removed, as the database reported it.
      */
     public function bulk_delete($ids) {
-        $ids = array_map('intval', is_array($ids) ? $ids : []);
+        $ids = $this->in_scope(array_map('intval', is_array($ids) ? $ids : []));
 
         if (empty($ids)) {
             return Failure::make(__('No IDs provided.', 'plugixa-recipe'));
@@ -262,7 +284,7 @@ final class ReviewService {
      * @return string|WP_Error The action that was applied.
      */
     public function bulk_action($ids, $action) {
-        $ids    = array_map('intval', is_array($ids) ? $ids : []);
+        $ids    = $this->in_scope(array_map('intval', is_array($ids) ? $ids : []));
         $action = sanitize_text_field($action);
 
         if (empty($ids) || empty($action)) {

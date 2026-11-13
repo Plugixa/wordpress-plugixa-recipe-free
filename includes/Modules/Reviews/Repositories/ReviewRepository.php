@@ -48,7 +48,7 @@ final class ReviewRepository extends Repository {
      *
      * @return array<int, mixed>
      */
-    private function filter(string $search, string $status, int $recipe_id, int $rating, int $min_rating): array {
+    private function filter(string $search, string $status, int $recipe_id, int $rating, int $min_rating, int $owner = 0): array {
         global $wpdb;
 
         $search = '' !== $search ? '%' . $wpdb->esc_like($search) . '%' : '';
@@ -59,17 +59,19 @@ final class ReviewRepository extends Repository {
             $recipe_id ? 1 : 0, $recipe_id,
             $rating ? 1 : 0, $rating,
             $min_rating ? 1 : 0, $min_rating,
+            // Owner gate: only reviews of recipes this user created (0 = every review).
+            $owner, $this->table('recipes'), $owner,
         ];
     }
 
     /** Rows matching the list filters. Empty strings and 0 mean "no filter". */
-    public function count(string $search, string $status, int $recipe_id, int $rating, int $min_rating): int {
+    public function count(string $search, string $status, int $recipe_id, int $rating, int $min_rating, int $owner = 0): int {
         global $wpdb;
 
         // Bound values for the shared WHERE block, in placeholder order. The count query
         // needs only the reviews table; the list query joins recipes too, so it gets its own
         // leading pair of identifiers.
-        $filter_gates = $this->filter($search, $status, $recipe_id, $rating, $min_rating);
+        $filter_gates = $this->filter($search, $status, $recipe_id, $rating, $min_rating, $owner);
 
         // Cache key: a stable digest of the bound values, never the SQL text.
         return (int) $this->remember('count|' . md5(wp_json_encode($filter_gates)), function () use ($wpdb, $filter_gates) {
@@ -79,10 +81,32 @@ final class ReviewRepository extends Repository {
                     AND ( %d = 0 OR rv.status = %s )
                     AND ( %d = 0 OR rv.recipe_id = %d )
                     AND ( %d = 0 OR rv.rating = %d )
-                    AND ( %d = 0 OR rv.rating >= %d )',
+                    AND ( %d = 0 OR rv.rating >= %d )
+                    AND ( %d = 0 OR EXISTS (SELECT 1 FROM %i ro WHERE ro.id = rv.recipe_id AND ro.created_by = %d) )',
                 ...array_merge([$this->table('reviews')], $filter_gates)
             ));
         });
+    }
+
+    /**
+     * Of these review ids, the ones on recipes a given user created. Uncached: it guards a write.
+     *
+     * @param string $id_list Comma-separated integer ids (bound as ONE value, FIND_IN_SET).
+     * @return int[]
+     */
+    public function owned_ids(string $id_list, int $owner): array {
+        global $wpdb;
+
+        return array_map('intval', (array) $wpdb->get_col($wpdb->prepare(
+            'SELECT rv.id FROM %i rv
+              WHERE FIND_IN_SET(rv.id, %s)
+                AND EXISTS (SELECT 1 FROM %i ro WHERE ro.id = rv.recipe_id AND ro.created_by = %d)
+              ORDER BY rv.id ASC',
+            $this->table('reviews'),
+            $id_list,
+            $this->table('recipes'),
+            $owner
+        )));
     }
 
     /**
@@ -96,10 +120,10 @@ final class ReviewRepository extends Repository {
      * @param string $order   ASC or DESC.
      * @return array<int, array<string, mixed>>
      */
-    public function page(string $search, string $status, int $recipe_id, int $rating, int $min_rating, string $orderby, string $order, int $limit, int $offset): array {
+    public function page(string $search, string $status, int $recipe_id, int $rating, int $min_rating, string $orderby, string $order, int $limit, int $offset, int $owner = 0): array {
         global $wpdb;
 
-        $filter_gates = $this->filter($search, $status, $recipe_id, $rating, $min_rating);
+        $filter_gates = $this->filter($search, $status, $recipe_id, $rating, $min_rating, $owner);
 
         $args = array_merge(
             [$this->table('reviews'), $this->table('recipes')],
@@ -118,6 +142,7 @@ final class ReviewRepository extends Repository {
                       AND ( %d = 0 OR rv.recipe_id = %d )
                       AND ( %d = 0 OR rv.rating = %d )
                       AND ( %d = 0 OR rv.rating >= %d )
+                      AND ( %d = 0 OR EXISTS (SELECT 1 FROM %i ro WHERE ro.id = rv.recipe_id AND ro.created_by = %d) )
                     ORDER BY rv.%i ASC, rv.id ASC
                     LIMIT %d OFFSET %d',
                     ...$args
@@ -132,6 +157,7 @@ final class ReviewRepository extends Repository {
                   AND ( %d = 0 OR rv.recipe_id = %d )
                   AND ( %d = 0 OR rv.rating = %d )
                   AND ( %d = 0 OR rv.rating >= %d )
+                  AND ( %d = 0 OR EXISTS (SELECT 1 FROM %i ro WHERE ro.id = rv.recipe_id AND ro.created_by = %d) )
                 ORDER BY rv.%i DESC, rv.id DESC
                 LIMIT %d OFFSET %d',
                 ...$args

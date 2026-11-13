@@ -28,6 +28,7 @@ class CuisinesController extends RestController {
     public function __construct(CuisineService $cuisines) {
         parent::__construct();
         $this->rest_base = 'cuisines';
+        $this->entity_type = 'cuisines';
         $this->cuisines  = $cuisines;
     }
 

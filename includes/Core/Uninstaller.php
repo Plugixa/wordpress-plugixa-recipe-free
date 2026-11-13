@@ -7,6 +7,8 @@
 
 namespace PlugixaRecipe\Core;
 
+use PlugixaRecipe\Core\Security\Capabilities;
+
 // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom-table data layer. Reads go through PlugixaRecipe\Core\Database\Cache, which the static sniff cannot trace through the wrapper; the write and bulk paths are uncached by nature and flush the affected entities afterwards. Every query is a constant literal with table identifiers bound via %i and values via $wpdb->prepare(), so the PreparedSQL.NotPrepared / InterpolatedNotPrepared sniffs are satisfied on their own and are NOT suppressed anywhere in this file.
 
 // phpcs:disable WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.SlowDBQuery -- The uninstaller's whole job is to DROP the plugin's own tables, so SchemaChange is the intended behaviour, not an accident. meta_key / meta_value here are real columns on the plugin's OWN meta table, not WP_Query post-meta arguments, so the slow-query sniff's premise does not apply.
@@ -191,14 +193,8 @@ class Uninstaller {
             // Preserve plugin data — only remove options and capabilities.
             self::delete_all_options();
 
-            $admin = get_role('administrator');
-            if ($admin) {
-                $admin->remove_cap('plugixa_recipe_manage');
-                $admin->remove_cap('plugixa_recipe_edit');
-                $admin->remove_cap('plugixa_recipe_delete');
-                $admin->remove_cap('plugixa_recipe_publish');
-                $admin->remove_cap('plugixa_recipe_settings');
-            }
+            // Every role and user, and the plugin's own roles - not only administrator.
+            Capabilities::revoke_all();
             return;
         }
 
@@ -297,13 +293,7 @@ class Uninstaller {
         self::delete_all_options();
 
         // Remove capabilities
-        $admin = get_role('administrator');
-        if ($admin) {
-            $admin->remove_cap('plugixa_recipe_manage');
-            $admin->remove_cap('plugixa_recipe_edit');
-            $admin->remove_cap('plugixa_recipe_delete');
-            $admin->remove_cap('plugixa_recipe_publish');
-            $admin->remove_cap('plugixa_recipe_settings');
-        }
+        // Every role and user, and the plugin's own roles - not only administrator.
+        Capabilities::revoke_all();
     }
 }

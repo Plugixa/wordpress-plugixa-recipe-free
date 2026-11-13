@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
  * The stylesheet and script every recipe listing and widget needs.
  *
  * Two routines, because they were always two: a listing localises the full string set (load
- * more, errors) and may add Swiper or the form script; a widget needs only the like/save
+ * more, errors) and may add Swiper; a widget needs only the like/save
  * tooltips. Each runs its common part once per request - the flags are static, where they
  * used to sit on whichever renderer instance happened to be asked. Layout-specific extras
  * are still evaluated on every call, since a slider can appear further down a page whose
@@ -29,33 +29,13 @@ final class Assets {
 
     /**
      * Enqueue what a recipe listing needs; $layout_style adds its own extras
-     * ('slider' -> Swiper, 'form' -> the submission form script).
+     * ('slider' -> Swiper).
      */
     public static function listing(string $layout_style = 'grid'): void {
-        // Layout-specific extras are evaluated on EVERY call: a slider or
-        // submission form can appear further down the page after another
-        // shortcode already enqueued the common assets, and the early-return
-        // below would otherwise skip them (wp_enqueue_* dedupes by handle,
-        // so repeated calls are harmless).
-
-        // Recipe submission form JS
-        if ($layout_style === 'form') {
-            $form_js = PLUGIXA_RECIPE_PATH . 'assets/frontend/js/recipe-form.js';
-            if (file_exists($form_js)) {
-                // The two scripts the form is built on. The parser is the SAME file the admin
-                // editor imports, so a pasted line means one thing on both sides.
-                wp_register_script('plugixa-recipe-parser', PLUGIXA_RECIPE_URL . 'assets/frontend/js/recipe-text-parser.js', [], PLUGIXA_RECIPE_VERSION, true);
-                wp_register_script('plugixa-recipe-sortable', PLUGIXA_RECIPE_URL . 'assets/frontend/js/sortable-list.js', [], PLUGIXA_RECIPE_VERSION, true);
-
-                wp_enqueue_script(
-                    'plugixa-recipe-form',
-                    PLUGIXA_RECIPE_URL . 'assets/frontend/js/recipe-form.js',
-                    ['plugixa-recipe-parser', 'plugixa-recipe-sortable'],
-                    PLUGIXA_RECIPE_VERSION,
-                    true
-                );
-            }
-        }
+        // Layout-specific extras are evaluated on EVERY call: a slider can appear further
+        // down the page after another shortcode already enqueued the common assets, and the
+        // early-return below would otherwise skip them (wp_enqueue_* dedupes by handle, so
+        // repeated calls are harmless).
 
         // Swiper for slider layout
         if ($layout_style === 'slider') {

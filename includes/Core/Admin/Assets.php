@@ -8,6 +8,7 @@
 namespace PlugixaRecipe\Core\Admin;
 
 use PlugixaRecipe\Core\App\Edition;
+use PlugixaRecipe\Core\Security\Capabilities;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -363,16 +364,16 @@ class Assets {
      * admitted through the edit_posts fallback while this payload reported false.
      */
     private function get_user_permissions(): array {
+        // The same Capabilities::user_can() every route asks, for the recipes entity (the
+        // controller RestPermissionsTest compares these flags with). An add-on that narrows
+        // permissions on the `plugixa_recipe_user_can` filter is therefore reflected here too.
         return [
             'manage_options'          => current_user_can('manage_options'),
-            'plugixa_recipe_manage'   => plugixa_recipe_user_can('plugixa_recipe_manage', 'edit_posts'),
-            'plugixa_recipe_edit'     => plugixa_recipe_user_can('plugixa_recipe_edit', 'edit_posts'),
-            // delete_published_posts, matching RestController::check_delete_permission().
-            // These two must name the same fallback or the admin UI advertises a permission
-            // the API refuses; RestPermissionsTest asserts they agree.
-            'plugixa_recipe_delete'   => plugixa_recipe_user_can('plugixa_recipe_delete', 'delete_published_posts'),
-            'plugixa_recipe_publish'  => plugixa_recipe_user_can('plugixa_recipe_publish', 'publish_posts'),
-            'plugixa_recipe_settings' => plugixa_recipe_user_can('plugixa_recipe_settings', 'manage_options'),
+            'plugixa_recipe_manage'   => Capabilities::user_can('read', 'recipes'),
+            'plugixa_recipe_edit'     => Capabilities::user_can('edit', 'recipes'),
+            'plugixa_recipe_delete'   => Capabilities::user_can('delete', 'recipes'),
+            'plugixa_recipe_publish'  => Capabilities::user_can('publish', 'recipes'),
+            'plugixa_recipe_settings' => Capabilities::user_can('settings', 'recipes'),
         ];
     }
 

@@ -34,7 +34,7 @@ final class Strings {
             'performance' => __('Performance', 'plugixa-recipe'),
             'api'         => __('API', 'plugixa-recipe'),
             'captcha'     => __('Captcha', 'plugixa-recipe'),
-            'form'        => __('Submission form', 'plugixa-recipe'),
+            'notifications' => __('Notifications & uploads', 'plugixa-recipe'),
             'advanced'    => __('Advanced', 'plugixa-recipe'),
 
             // Section headings and the line under each.
@@ -52,8 +52,13 @@ final class Strings {
             'settings_api_hint'         => __('REST API access and rate limiting.', 'plugixa-recipe'),
             'settings_captcha'          => __('Captcha', 'plugixa-recipe'),
             'settings_captcha_hint'     => __('Cloudflare Turnstile credentials.', 'plugixa-recipe'),
-            'settings_form'             => __('Submission form', 'plugixa-recipe'),
-            'settings_form_hint'        => __('The frontend recipe submission form.', 'plugixa-recipe'),
+            'settings_notifications'      => __('Notifications & uploads', 'plugixa-recipe'),
+            'settings_notifications_hint' => __('What happens when a visitor sends you something.', 'plugixa-recipe'),
+            'notification_enabled'        => __('Email me when something arrives for moderation', 'plugixa-recipe'),
+            'notification_recipients'     => __('Notification recipients', 'plugixa-recipe'),
+            'notification_recipients_help' => __('Comma-separated email addresses. Leave empty to use the site admin email.', 'plugixa-recipe'),
+            'max_upload_size'             => __('Max upload size (MB)', 'plugixa-recipe'),
+            'max_upload_size_help'        => __('The largest photo a visitor may upload. Your server’s own limit applies if it is lower.', 'plugixa-recipe'),
             'settings_advanced'         => __('Advanced', 'plugixa-recipe'),
             'settings_advanced_hint'    => __('Debug mode and what uninstalling removes.', 'plugixa-recipe'),
 

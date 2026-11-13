@@ -1,6 +1,6 @@
 <?php
 /**
- * [plugixa_recipe_account] - the visitor's three pages as tabs.
+ * [plugixa_recipe_account] - the visitor's pages as tabs.
  *
  * The panels are the same views the single shortcodes draw, included here, so there is
  * one shell per page whichever way it is reached.
@@ -17,8 +17,29 @@ $plugixa_recipe_tabs = array();
 if ( ! empty( $show_saved ) ) {
     $plugixa_recipe_tabs['saved'] = array( __( 'Saved recipes', 'plugixa-recipe' ), 'account/saved.php' );
 }
-$plugixa_recipe_tabs['list']        = array( __( 'Shopping list', 'plugixa-recipe' ), 'account/shopping-list.php' );
-$plugixa_recipe_tabs['submissions'] = array( __( 'My recipes', 'plugixa-recipe' ), 'account/submissions.php' );
+
+/**
+ * The tabs of [plugixa_recipe_account]: key => array( label, view name ).
+ *
+ * A module adds its own page here; the view is asked for by NAME, so it lives in that
+ * module's views folder. A view receives $login_url.
+ *
+ * @since 1.4.0
+ * @param array<string, array{0: string, 1: string}> $plugixa_recipe_tabs
+ */
+$plugixa_recipe_tabs = (array) apply_filters( 'plugixa_recipe_account_tabs', $plugixa_recipe_tabs );
+
+// A tab whose view cannot be found is not drawn: an empty panel would be a dead tab.
+$plugixa_recipe_tabs = array_filter(
+    $plugixa_recipe_tabs,
+    static function ( $plugixa_recipe_tab ) {
+        return is_array( $plugixa_recipe_tab ) && isset( $plugixa_recipe_tab[0], $plugixa_recipe_tab[1] )
+            && '' !== plugixa_recipe_template( (string) $plugixa_recipe_tab[1] );
+    }
+);
+if ( empty( $plugixa_recipe_tabs ) ) {
+    return;
+}
 
 $plugixa_recipe_first = (string) array_key_first( $plugixa_recipe_tabs );
 ?>

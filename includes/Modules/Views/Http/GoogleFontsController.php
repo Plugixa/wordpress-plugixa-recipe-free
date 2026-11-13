@@ -22,6 +22,7 @@ class GoogleFontsController extends RestController {
     public function __construct() {
         parent::__construct();
         $this->rest_base = 'google-fonts';
+        $this->entity_type = 'views';
     }
 
     public function register_routes(): void {

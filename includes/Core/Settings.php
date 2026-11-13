@@ -39,13 +39,11 @@ final class Settings {
             'review_moderation'     => true,
             'review_default_status' => 'pending',
             'enable_print'          => true,
-            'submission_require_login' => false,
-            'submission_status'     => 'pending',
+            // The largest photo a visitor may upload, for every public form.
             'max_upload_size'       => 5,
-            'success_message'       => 'Your recipe has been submitted successfully and is pending review.',
             // Cloudflare Turnstile. There is no score threshold: Turnstile returns a
-            // pass/fail verdict, not reCAPTCHA v3's 0.0-1.0 score.
-            'turnstile_form_enabled'    => false,
+            // pass/fail verdict, not reCAPTCHA v3's 0.0-1.0 score. A premium form declares
+            // its own switch; the keys are shared.
             'turnstile_reviews_enabled' => false,
             'turnstile_site_key'    => '',
             'turnstile_secret_key'  => '',

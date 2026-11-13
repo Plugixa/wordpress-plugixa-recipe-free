@@ -334,6 +334,14 @@ final class Schema {
         $renamed += (int) $wpdb->query($wpdb->prepare('UPDATE %i SET cost = %s WHERE cost = %s', $recipes_table, 'moderate', 'medium'));
         $renamed += (int) $wpdb->query($wpdb->prepare('UPDATE %i SET cost = %s WHERE cost = %s', $recipes_table, 'expensive', 'high'));
 
+        // ...and the column DEFAULT, which CREATE TABLE IF NOT EXISTS never touches on a site
+        // that had the table: it stayed `medium`, so every insert that names no cost stored a
+        // value the editor refuses, and that recipe could not be saved from the admin again.
+        $cost_col = $wpdb->get_row($wpdb->prepare('SHOW COLUMNS FROM %i LIKE %s', $recipes_table, $wpdb->esc_like('cost')), ARRAY_A);
+        if (is_array($cost_col) && 'moderate' !== ($cost_col['Default'] ?? null)) {
+            $wpdb->query($wpdb->prepare('ALTER TABLE %i ALTER COLUMN cost SET DEFAULT %s', $recipes_table, 'moderate'));
+        }
+
         // Migration: origin marks out of the credit column (Enums::ORIGIN_MARKS). Only the
         // two that nothing reads; the other two are how an earlier import is still
         // recognised, and the presenter keeps them off the page. Matches nothing once run.

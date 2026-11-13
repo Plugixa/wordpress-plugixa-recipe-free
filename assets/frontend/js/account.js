@@ -1,5 +1,6 @@
 /**
- * Plugixa Recipe - the visitor's account pages: saved recipes, submitted recipes, tabs.
+ * Plugixa Recipe - the visitor's account pages: saved recipes, and the tabs. A module that
+ * adds a page draws it with the helpers below (window.PlugixaRecipeAccount).
  *
  * The page is the same for every visitor (a page cache serves one copy), so nothing on it
  * says who is looking. This script asks: `whoami()` calls admin-ajax, which knows the
@@ -137,40 +138,6 @@
         });
     }
 
-    function initSubmissions(root) {
-        var list = root.querySelector('[data-pxr-account-list]');
-        var template = root.querySelector('template[data-pxr-account-template]');
-
-        api('frontend/account/submissions').then(function (answer) {
-            var items = answer && answer.data ? answer.data : [];
-            if (!items.length) { show(root, 'empty'); return; }
-
-            items.forEach(function (item) {
-                var row = template.content.firstElementChild.cloneNode(true);
-                fillLinks(row, item);
-
-                // A recipe that is not live has no page: its title is text, not a link.
-                var plain = row.querySelector('[data-pxr-card-plain-title]');
-                if (item.url) {
-                    plain.hidden = true;
-                } else {
-                    plain.textContent = item.title;
-                }
-
-                row.querySelector('[data-pxr-card-meta]').textContent = item.date || '';
-                var status = row.querySelector('[data-pxr-card-status]');
-                status.textContent = item.status;
-                status.classList.toggle('pxr-account__status--live', !!item.live);
-
-                list.appendChild(row);
-            });
-            show(root, '');
-        }, function (reason) {
-            if (reason && reason.status === 401) { show(root, 'signed-out'); return; }
-            fail(root);
-        });
-    }
-
     /* ─── Tabs ─────────────────────────────────────────────────── */
 
     function initTabs(root) {
@@ -202,11 +169,11 @@
 
     function init() {
         document.querySelectorAll('[data-pxr-account="saved"]').forEach(initSaved);
-        document.querySelectorAll('[data-pxr-account="submissions"]').forEach(initSubmissions);
         document.querySelectorAll('[data-pxr-account-tabs]').forEach(initTabs);
     }
 
-    window.PlugixaRecipeAccount = { whoami: whoami, api: api };
+    // What a tab added by another module needs to draw its own rows the same way.
+    window.PlugixaRecipeAccount = { whoami: whoami, api: api, show: show, fail: fail, fillLinks: fillLinks };
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);

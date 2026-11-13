@@ -12,9 +12,9 @@ use WP_REST_Response;
 defined('ABSPATH') || exit;
 
 /**
- * /frontend/account/* - the caller's own saved recipes and submissions.
+ * /frontend/account/saved - the caller's own saved recipes.
  *
- * Both routes require a login and take NO user parameter: the only id ever used is
+ * The route requires a login and takes NO user parameter: the only id ever used is
  * get_current_user_id(), so there is no other visitor's list to ask for. The answers are
  * personal, so they are sent `no-store` - a shared cache must never hold one.
  */
@@ -36,13 +36,6 @@ class AccountController extends PublicController {
             ],
         ]);
 
-        register_rest_route($this->namespace, '/' . $this->rest_base . '/account/submissions', [
-            [
-                'methods'             => 'GET',
-                'callback'            => [$this, 'submissions'],
-                'permission_callback' => [$this, 'check_login'],
-            ],
-        ]);
     }
 
     public function check_login(): bool {
@@ -51,10 +44,6 @@ class AccountController extends PublicController {
 
     public function saved(): WP_REST_Response {
         return $this->personal($this->account->saved(get_current_user_id()));
-    }
-
-    public function submissions(): WP_REST_Response {
-        return $this->personal($this->account->submissions(get_current_user_id()));
     }
 
     /**

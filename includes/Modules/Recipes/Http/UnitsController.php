@@ -28,6 +28,7 @@ class UnitsController extends RestController {
     public function __construct(UnitService $units) {
         parent::__construct();
         $this->rest_base = 'units';
+        $this->entity_type = 'units';
         $this->units     = $units;
     }
 

@@ -10,6 +10,7 @@ use PlugixaRecipe\Core\Modules\AbstractModule;
 use PlugixaRecipe\Modules\Shortcodes\Blocks\RecipeBlock;
 use PlugixaRecipe\Modules\Shortcodes\Blocks\SingleRecipeBlock;
 use PlugixaRecipe\Modules\Shortcodes\Frontend\ListingShortcode;
+use PlugixaRecipe\Modules\Shortcodes\Frontend\RetiredShortcodes;
 use PlugixaRecipe\Modules\Shortcodes\Frontend\Widgets\RecipeCountWidget;
 use PlugixaRecipe\Modules\Shortcodes\Frontend\Widgets\RecipeListWidget;
 use PlugixaRecipe\Modules\Shortcodes\Frontend\Widgets\RecipeOfDayWidget;
@@ -57,6 +58,9 @@ final class Module extends AbstractModule {
     /** This module's templates resolve by name through plugixa_recipe_template(). */
     public function registerServices(): void {
         Templates::add_path(__DIR__ . '/views');
+
+        // Late, and only for a tag nothing else has registered by then.
+        add_action('init', [new RetiredShortcodes(), 'register'], 99);
     }
 
     /**

@@ -620,12 +620,18 @@
     }
 
     /**
-     * Format a number back to a friendly display string.
-     * Whole numbers → "2", common fractions → "1/2", mixed → "1 1/2",
-     * others → rounded to 2 decimals.
+     * Format a scaled amount the way a cook writes it, by the rule the reader tools use:
+     * from 10 up a whole number ("233 g", "13 cups"); below 10 one decimal for a metric
+     * unit ("7.5 ml"), a kitchen fraction for anything else ("1 3/4 tbsp"). A metric amount
+     * was shown as "233 1/3 g" before 1.4.0.
+     *
+     * @param {number}  num
+     * @param {boolean} metric The line's unit is metric (data-pxr-unit-system).
      */
-    function formatAmount(num) {
+    function formatAmount(num, metric) {
         if (isNaN(num) || num <= 0) return '';
+        if (num >= 10) return String(Math.round(num));
+        if (metric) return String(Math.round(num * 10) / 10);
 
         var whole = Math.floor(num);
         var frac = num - whole;
@@ -679,14 +685,15 @@
                 originals.push({
                     span: span,
                     amountEl: amountEl,
-                    original: raw,
-                    parsed: parseFraction(raw)
+                    original: amountEl ? amountEl.textContent : raw,
+                    parsed: parseFraction(raw),
+                    metric: span.getAttribute('data-pxr-unit-system') === 'metric'
                 });
             });
 
             function updateAmounts(newServings) {
                 var ratio = newServings / originalServings;
-                // With the reader tools on the page, recipe-tools.js writes the amounts
+                // With the reader tools on the page, their script writes the amounts
                 // (it also converts units): two writers would overwrite each other.
                 if (recipeRoot.hasAttribute('data-pxr-tools-active')) {
                     recipeRoot.dispatchEvent(new CustomEvent('pxr:scale', { detail: { ratio: ratio } }));
@@ -694,8 +701,12 @@
                 }
                 originals.forEach(function (item) {
                     if (!item.amountEl || isNaN(item.parsed)) return;
-                    var scaled = item.parsed * ratio;
-                    item.amountEl.textContent = formatAmount(scaled);
+                    // Back at the recipe's own servings: the author's text, as written.
+                    if (ratio === 1) {
+                        item.amountEl.textContent = item.original;
+                        return;
+                    }
+                    item.amountEl.textContent = formatAmount(item.parsed * ratio, item.metric);
                 });
             }
 
@@ -982,7 +993,7 @@
                             if (review.images && review.images.length) {
                                 imagesHtml = '<div class="pxr-custom-review__images pxr:flex pxr:flex-wrap pxr:gap-2 pxr:mt-3">';
                                 review.images.forEach(function(img) {
-                                    imagesHtml += '<a href="' + (img.full || img.url) + '" target="_blank" rel="noopener" class="pxr-custom-review__image-link pxr:block pxr:w-16 pxr:h-16 pxr:rounded-lg pxr:overflow-hidden pxr:border pxr:transition-opacity hover:pxr:opacity-80">'
+                                    imagesHtml += '<a href="' + (img.full || img.url) + '" target="_blank" rel="noopener" class="pxr-custom-review__image-link pxr:block pxr:w-16 pxr:h-16 pxr:rounded-lg pxr:overflow-hidden pxr:border pxr:transition-opacity pxr:hover:opacity-80">'
                                         + '<img src="' + img.url + '" alt="Review photo" class="pxr:w-full pxr:h-full pxr:object-cover" loading="lazy" />'
                                         + '</a>';
                                 });

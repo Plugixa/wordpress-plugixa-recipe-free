@@ -68,8 +68,6 @@ final class SettingsService {
                 case 'show_reviews':
                 case 'review_moderation':
                 case 'enable_print':
-                case 'submission_require_login':
-                case 'turnstile_form_enabled':
                 case 'turnstile_reviews_enabled':
                 case 'notification_enabled':
                 case 'allow_guest_reviews':
@@ -168,7 +166,9 @@ final class SettingsService {
         }
 
         // Recent recipes
-        $recent_recipes = $this->stats->recent_recipes();
+        // The two lists that name other people's content follow the lists' own owner scope:
+        // a member's dashboard showed another member's unpublished recipe and review text.
+        $recent_recipes = $this->stats->recent_recipes(\PlugixaRecipe\Core\Security\Capabilities::owner_scope('recipes'));
         foreach ($recent_recipes as &$rr) {
             $rr['rating_average'] = (float) $rr['rating_average'];
             $rr['average_rating'] = $rr['rating_average'];
@@ -188,9 +188,6 @@ final class SettingsService {
         // Cuisines count
         $total_cuisines = (int) $this->stats->count_all('cuisines');
 
-        // Collections count
-        $total_collections = (int) $this->stats->count_all('collections');
-
         // Total views (sum of view_count from recipes)
         $total_views = (int) $this->stats->total_views();
 
@@ -198,7 +195,7 @@ final class SettingsService {
         $total_favorites = (int) $this->stats->count_all('favorites');
 
         // Recent reviews
-        $recent_reviews = $this->stats->recent_reviews();
+        $recent_reviews = $this->stats->recent_reviews(\PlugixaRecipe\Core\Security\Capabilities::owner_scope('reviews'));
         foreach ($recent_reviews as &$rr2) {
             $rr2['rating'] = (int) $rr2['rating'];
         }
@@ -255,7 +252,7 @@ final class SettingsService {
             return $out;
         };
 
-        return [
+        $stats = [
             'total_recipes'         => $total_recipes,
             'published_recipes'     => $statuses['published'] ?? 0,
             'draft_recipes'         => $statuses['draft'] ?? 0,
@@ -264,7 +261,6 @@ final class SettingsService {
             'average_rating'        => round($avg_rating, 2),
             'total_categories'      => $total_categories,
             'total_cuisines'        => $total_cuisines,
-            'total_collections'     => $total_collections,
             'total_views'           => $total_views,
             'total_favorites'       => $total_favorites,
             'rating_distribution'   => $rating_distribution,
@@ -279,5 +275,15 @@ final class SettingsService {
             'total_reviews'         => $total_reviews,
             'pending_reviews'       => $pending_reviews,
         ];
+
+        /**
+         * The dashboard's figures. A module that owns a table adds its own count here: the
+         * free core counts only tables it creates, or a site without that module would
+         * query a table that does not exist.
+         *
+         * @since 1.4.0
+         * @param array<string, mixed> $stats
+         */
+        return (array) apply_filters('plugixa_recipe_dashboard_stats', $stats);
     }
 }
