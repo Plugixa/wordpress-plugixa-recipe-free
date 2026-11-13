@@ -177,8 +177,8 @@ final class TranslationRepository extends Repository {
         // Each copy names its table twice (INSERT target and SELECT source), so both
         // bind as identifiers with %i, interleaved in the positional argument list.
         $wpdb->query($wpdb->prepare(
-            'INSERT INTO %i (recipe_id, group_name, group_order, sort_order, quantity, unit, name, notes, link_url)
-                SELECT %d, group_name, group_order, sort_order, quantity, unit, name, notes, link_url
+            'INSERT INTO %i (recipe_id, group_name, group_order, sort_order, quantity, unit, name, notes, link_url, amount, amount_max, is_optional, substitution)
+                SELECT %d, group_name, group_order, sort_order, quantity, unit, name, notes, link_url, amount, amount_max, is_optional, substitution
                 FROM %i WHERE recipe_id = %d',
             $this->table('ingredients'),
             $new_id,
@@ -187,8 +187,8 @@ final class TranslationRepository extends Repository {
         ));
 
         $wpdb->query($wpdb->prepare(
-            'INSERT INTO %i (recipe_id, group_name, group_order, sort_order, instruction_text, image_id, video_url, duration)
-                SELECT %d, group_name, group_order, sort_order, instruction_text, image_id, video_url, duration
+            'INSERT INTO %i (recipe_id, group_name, group_order, sort_order, title, instruction_text, image_id, video_url, duration, timer_seconds, tip)
+                SELECT %d, group_name, group_order, sort_order, title, instruction_text, image_id, video_url, duration, timer_seconds, tip
                 FROM %i WHERE recipe_id = %d',
             $this->table('instructions'),
             $new_id,

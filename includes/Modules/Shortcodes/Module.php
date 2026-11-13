@@ -8,6 +8,7 @@ namespace PlugixaRecipe\Modules\Shortcodes;
 use PlugixaRecipe\Core\Frontend\Templates;
 use PlugixaRecipe\Core\Modules\AbstractModule;
 use PlugixaRecipe\Modules\Shortcodes\Blocks\RecipeBlock;
+use PlugixaRecipe\Modules\Shortcodes\Blocks\SingleRecipeBlock;
 use PlugixaRecipe\Modules\Shortcodes\Frontend\ListingShortcode;
 use PlugixaRecipe\Modules\Shortcodes\Frontend\Widgets\RecipeCountWidget;
 use PlugixaRecipe\Modules\Shortcodes\Frontend\Widgets\RecipeListWidget;
@@ -65,6 +66,8 @@ final class Module extends AbstractModule {
     public function registerHooks(): void {
         add_action('init', [new ListingShortcode(), 'register']);
         add_action('init', [new RecipeBlock(), 'register']);
+        // After RecipeBlock: it registers the editor stylesheet this block shares.
+        add_action('init', [new SingleRecipeBlock(), 'register'], 11);
 
         // Widget shortcodes: sidebar-sized pieces, one class per kind.
         foreach ([

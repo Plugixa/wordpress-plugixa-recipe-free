@@ -370,7 +370,7 @@ final class PublicRecipeRepository extends Repository {
         return $this->remember('recipe_ingredients|' . $id, function () use ($wpdb, $ingredients_table, $id) {
             return $wpdb->get_results($wpdb->prepare(
                 'SELECT id, recipe_id, group_name, group_order, sort_order,
-                    quantity, unit, name, notes, link_url
+                    quantity, unit, name, notes, link_url, amount, amount_max, is_optional, substitution
                   FROM %i
                   WHERE recipe_id = %d
                   ORDER BY group_order ASC, sort_order ASC',
@@ -393,7 +393,7 @@ final class PublicRecipeRepository extends Repository {
         return $this->remember('recipe_instructions|' . $id, function () use ($wpdb, $instructions_table, $id) {
             return $wpdb->get_results($wpdb->prepare(
                 'SELECT id, recipe_id, group_name, group_order, sort_order,
-                    title, instruction_text, image_id, video_url, duration
+                    title, instruction_text, image_id, video_url, duration, timer_seconds, tip
                   FROM %i
                   WHERE recipe_id = %d
                   ORDER BY group_order ASC, sort_order ASC',

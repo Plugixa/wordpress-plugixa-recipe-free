@@ -61,6 +61,7 @@ class Elementor {
         // RecipeWidget extends an Elementor class, so it is only ever loaded from here - on
         // Elementor's own hook, when that parent is guaranteed to exist.
         $widgets_manager->register(new RecipeWidget());
+        $widgets_manager->register(new SingleRecipeWidget());
     }
 
     /**

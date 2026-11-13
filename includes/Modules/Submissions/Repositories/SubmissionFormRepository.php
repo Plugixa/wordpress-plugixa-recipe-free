@@ -23,9 +23,26 @@ defined( 'ABSPATH' ) || exit;
  */
 final class SubmissionFormRepository extends Repository {
 
-    /** The three term entities the lists are read from; each read names its own below. */
+    /** The entities the lists are read from; each read names its own below. */
     protected function entities(): array {
-        return ['categories', 'cuisines', 'courses'];
+        return ['categories', 'cuisines', 'courses', 'units'];
+    }
+
+    /**
+     * The site's units, as the form suggests them and as its paste parser recognises them:
+     * `value` is the abbreviation that is stored, `name` the word it stands for.
+     *
+     * @return array<int, array{value: string, name: string}>
+     */
+    public function unit_options(): array {
+        global $wpdb;
+
+        return (array) $this->remember_as('units', 'form_options', function () use ($wpdb) {
+            return $wpdb->get_results(
+                $wpdb->prepare('SELECT abbreviation AS value, name FROM %i ORDER BY type ASC, id ASC', $this->table('units')),
+                ARRAY_A
+            ) ?: [];
+        });
     }
 
     /**

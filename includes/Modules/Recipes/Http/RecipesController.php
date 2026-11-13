@@ -97,6 +97,14 @@ class RecipesController extends RestController {
             ],
         ]);
 
+        register_rest_route($this->namespace, '/' . $this->rest_base . '/suggestions', [
+            [
+                'methods'             => 'GET',
+                'callback'            => [$this, 'get_suggestions'],
+                'permission_callback' => [$this, 'check_read_permission'],
+            ],
+        ]);
+
         register_rest_route($this->namespace, '/' . $this->rest_base . '/(?P<id>\d+)/duplicate', [
             [
                 'methods'             => 'POST',
@@ -280,6 +288,13 @@ class RecipesController extends RestController {
 
         /* translators: %s: the bulk action that was applied (e.g. publish, draft, feature). */
         return $this->success(null, sprintf(__('Bulk %s completed.', 'plugixa-recipe'), $action));
+    }
+
+    /**
+     * Ingredient names, tags and equipment already in use, for the editor's suggestions.
+     */
+    public function get_suggestions($request): WP_REST_Response|WP_Error {
+        return $this->success($this->recipes->suggestions());
     }
 
     /**

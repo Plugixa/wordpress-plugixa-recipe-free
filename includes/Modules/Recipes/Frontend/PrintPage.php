@@ -9,23 +9,16 @@ namespace PlugixaRecipe\Modules\Recipes\Frontend;
 
 defined( 'ABSPATH' ) || exit;
 
-use PlugixaRecipe\Modules\Recipes\Repositories\PrintPageRepository;
+use PlugixaRecipe\Modules\Recipes\Services\RecipePresenter;
 
 /**
  * Print Class - Handles print-friendly recipe output.
  *
  * Registers a rewrite rule for /recipe-print/{id} that outputs a clean,
  * ad-free HTML page suitable for printing with recipe details. Every query it
- * needs lives in PrintPageRepository.
+ * shows comes from Services\RecipePresenter - the struct the recipe's own page draws.
  */
 class PrintPage {
-
-    /** @var PrintPageRepository */
-    private $repository;
-
-    public function __construct() {
-        $this->repository = new PrintPageRepository();
-    }
 
     /**
      * Initialize print route hooks.
@@ -65,7 +58,8 @@ class PrintPage {
         }
 
         $recipe_id = (int) $recipe_id;
-        $recipe = $this->repository->find_published($recipe_id);
+        // The presenter alone: printing a recipe is not another visit to it.
+        $recipe = (new RecipePresenter())->recipe($recipe_id);
 
         if (!$recipe) {
             wp_die(
@@ -93,9 +87,6 @@ class PrintPage {
         $this->register_print_assets();
 
         $template = plugixa_recipe_template( 'print.php' );
-        $data     = $this->prepare_print_data($recipe);
-        unset($recipe);
-        extract($data, EXTR_SKIP);
         include $template;
         exit;
     }
@@ -114,96 +105,25 @@ class PrintPage {
             PLUGIXA_RECIPE_VERSION
         );
 
+        /**
+         * Filters the script handles the print view's own script depends on. They are
+         * printed with it: the print view prints by handle, never the whole queue.
+         *
+         * @since 1.2.0
+         *
+         * @param string[] $handles Registered script handles.
+         */
+        $dependencies = array_values(array_filter(
+            (array) apply_filters('plugixa_recipe_print_script_dependencies', []),
+            static fn($handle): bool => is_string($handle) && wp_script_is($handle, 'registered')
+        ));
+
         wp_enqueue_script(
             'plugixa-recipe-print',
             PLUGIXA_RECIPE_URL . 'assets/frontend/js/print.js',
-            [],
+            $dependencies,
             PLUGIXA_RECIPE_VERSION,
             true
         );
-    }
-
-    /**
-     * Prepare data for the print template.
-     *
-     * Enriches the raw DB array with computed fields (image_url, permalink,
-     * grouped ingredients/instructions, nutrition, cuisine) and casts to
-     * object so templates can use $recipe->title syntax.
-     */
-    private function prepare_print_data(array $recipe): array {
-        $recipe_id = (int) $recipe['id'];
-
-        // Image URL from attachment ID.
-        if (!empty($recipe['image_id'])) {
-            $recipe['image_url'] = wp_get_attachment_image_url((int) $recipe['image_id'], 'medium_large') ?: '';
-        } else {
-            $recipe['image_url'] = '';
-        }
-
-        // Permalink.
-        $slug = sanitize_title($recipe['title'] ?? '');
-        $recipe['permalink'] = plugixa_recipe_permalink((int) $recipe_id, $slug);
-
-        // Grouped ingredients & instructions.
-        $recipe['ingredient_groups']  = $this->group_ingredients($this->repository->ingredients($recipe_id));
-        $recipe['instruction_groups'] = $this->group_instructions($this->repository->instructions($recipe_id));
-
-        // Nutrition (cast to object for $nutrition->calories syntax).
-        $nutrition = $this->repository->nutrition($recipe_id);
-        $recipe['nutrition'] = $nutrition ? (object) $nutrition : null;
-
-        // Cuisine name from first assigned cuisine.
-        $cuisines = $this->repository->cuisines($recipe_id);
-        $recipe['cuisine'] = !empty($cuisines) ? $cuisines[0]['name'] : '';
-
-        return [
-            'recipe'    => (object) $recipe,
-            'site_name' => get_bloginfo('name'),
-            'site_url'  => home_url(),
-        ];
-    }
-
-    /**
-     * Group ingredient rows by group_name, mapping DB columns to template fields.
-     */
-    private function group_ingredients(array $rows): array {
-        $groups  = [];
-        $current = null;
-
-        foreach ($rows as $row) {
-            $name = $row['group_name'] ?? '';
-            if ($name !== $current) {
-                $current  = $name;
-                $groups[] = (object) ['name' => $current, 'items' => []];
-            }
-            $row['text']   = $row['name'] ?? '';
-            $row['amount'] = $row['quantity'] ?? '';
-            $groups[count($groups) - 1]->items[] = (object) $row;
-        }
-
-        return $groups;
-    }
-
-    /**
-     * Group instruction rows by group_name, mapping DB columns to template fields.
-     */
-    private function group_instructions(array $rows): array {
-        $groups  = [];
-        $current = null;
-
-        foreach ($rows as $row) {
-            $name = $row['group_name'] ?? '';
-            if ($name !== $current) {
-                $current  = $name;
-                $groups[] = (object) ['name' => $current, 'steps' => []];
-            }
-            $row['text']      = $row['instruction_text'] ?? '';
-            $row['image_url'] = !empty($row['image_id'])
-                ? wp_get_attachment_image_url((int) $row['image_id'], 'medium')
-                : '';
-            $groups[count($groups) - 1]->steps[] = (object) $row;
-        }
-
-        return $groups;
     }
 }

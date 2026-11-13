@@ -50,6 +50,88 @@ final class ShoppingListService {
         return null !== $list && (int) ($list['user_id'] ?? 0) === get_current_user_id();
     }
 
+    /** How many lines a visitor's own list may hold. */
+    private const PERSONAL_LIMIT = 300;
+
+    /**
+     * The caller's own list, as the public shopping-list page keeps it.
+     *
+     * @return array<int, array{name:string, quantity:string, unit:string, checked:bool}>
+     */
+    public function personal_items(): array {
+        $list_id = $this->lists->personal_list_id(get_current_user_id());
+        $items   = [];
+
+        foreach ($list_id ? $this->lists->items($list_id) : [] as $row) {
+            $items[] = [
+                'name'     => (string) $row['ingredient_name'],
+                'quantity' => (string) ($row['quantity'] ?? ''),
+                'unit'     => (string) ($row['unit'] ?? ''),
+                'checked'  => !empty($row['is_checked']),
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * Replace the caller's own list with what their browser holds.
+     *
+     * The whole list is sent each time: the page is the editor and this is its copy, so
+     * there is no per-line id for another caller to guess. A line without a name is
+     * dropped; anything past the limit is dropped rather than refused, so a long list
+     * still saves.
+     *
+     * @param array<int, mixed> $items Raw, untrusted payload.
+     * @return array<int, array{name:string, quantity:string, unit:string, checked:bool}> What was stored.
+     */
+    public function replace_personal_items(array $items): array {
+        $user_id = get_current_user_id();
+        $now     = current_time('mysql');
+        $rows    = [];
+
+        foreach ($items as $item) {
+            if (!is_array($item) || count($rows) >= self::PERSONAL_LIMIT) {
+                continue;
+            }
+            $name = self::line($item['name'] ?? '', 500);
+            if ('' === $name) {
+                continue;
+            }
+            $rows[] = [
+                'recipe_id'       => null,
+                'ingredient_name' => $name,
+                'quantity'        => self::line($item['quantity'] ?? '', 50),
+                'unit'            => self::line($item['unit'] ?? '', 50),
+                'is_checked'      => empty($item['checked']) ? 0 : 1,
+                'sort_order'      => count($rows),
+                'added_at'        => $now,
+            ];
+        }
+
+        $list_id = $this->lists->personal_list_id($user_id);
+        if (!$list_id) {
+            $this->lists->create([
+                'user_id'    => $user_id,
+                'name'       => __('My shopping list', 'plugixa-recipe'),
+                // Not `active`: see ShoppingListRepository::personal_list_id().
+                'status'     => 'personal',
+                'created_at' => $now,
+            ], $rows);
+        } else {
+            $this->lists->replace_personal_items($list_id, $user_id, $rows);
+        }
+
+        return $this->personal_items();
+    }
+
+    /** One line of text from an untrusted value, cut to its column. */
+    private static function line($value, int $max): string {
+        $text = is_scalar($value) ? sanitize_text_field((string) $value) : '';
+
+        return function_exists('mb_substr') ? mb_substr($text, 0, $max) : substr($text, 0, $max);
+    }
+
     /**
      * Shopping lists for the current user.
      *

@@ -6,6 +6,7 @@
 namespace PlugixaRecipe\Modules\Recipes\Services;
 
 use PlugixaRecipe\Core\Http\Failure;
+use PlugixaRecipe\Modules\Recipes\Enums;
 use PlugixaRecipe\Modules\Recipes\Repositories\RecipeChildRepository;
 use PlugixaRecipe\Modules\Recipes\Repositories\RecipeRepository;
 use WP_Error;
@@ -178,7 +179,10 @@ final class RecipeService {
 
         // Decode JSON array fields
         $recipe['tags'] = !empty($recipe['tags']) ? json_decode($recipe['tags'], true) : [];
-        $recipe['equipment'] = !empty($recipe['equipment']) ? json_decode($recipe['equipment'], true) : [];
+        // `equipment` stays the list of names it always was; `equipment_items` adds each
+        // item's optional link. A save may send either (see equipment_column()).
+        $recipe['equipment_items'] = Equipment::decode($recipe['equipment'] ?? '');
+        $recipe['equipment']       = array_column($recipe['equipment_items'], 'name');
 
         // Categories
         $recipe['categories'] = $this->recipes->categories($id);
@@ -240,71 +244,18 @@ final class RecipeService {
     public function create($params) {
         $now    = current_time('mysql');
 
+        // What this status demands (see required_for()), then the fixed choices.
+        $unmet = $this->unmet($params, $this->required_for($this->requested_status($params) ?? 'draft'), true);
+        if (null !== $unmet) {
+            return $unmet;
+        }
+
+        $refused = $this->refused_choice($params) ?? $this->refused_elsewhere($params, 0);
+        if (null !== $refused) {
+            return $refused;
+        }
+
         $title = sanitize_text_field($params['title'] ?? '');
-        if (empty($title)) {
-            return Failure::make(__('Title is required.', 'plugixa-recipe'));
-        }
-
-        $description_check = wp_kses_post($params['description'] ?? '');
-        if (empty(trim(wp_strip_all_tags($description_check)))) {
-            return Failure::make(__('Description is required.', 'plugixa-recipe'));
-        }
-
-        $image_id_check = !empty($params['image_id']) ? (int) $params['image_id'] : 0;
-        if ($image_id_check < 1) {
-            return Failure::make(__('Recipe image is required.', 'plugixa-recipe'));
-        }
-
-        $category_ids_check = $params['category_ids'] ?? [];
-        if (empty($category_ids_check) || !is_array($category_ids_check) || count(array_filter($category_ids_check)) < 1) {
-            return Failure::make(__('At least one category is required.', 'plugixa-recipe'));
-        }
-
-        $difficulty_check = sanitize_text_field($params['difficulty'] ?? '');
-        if (empty($difficulty_check) || !in_array($difficulty_check, ['easy', 'medium', 'hard', 'expert'], true)) {
-            return Failure::make(__('Difficulty is required.', 'plugixa-recipe'));
-        }
-
-        $servings_check = isset($params['servings']) ? (int) $params['servings'] : 0;
-        if ($servings_check < 1) {
-            return Failure::make(__('Servings must be at least 1.', 'plugixa-recipe'));
-        }
-
-        if (!isset($params['prep_time']) || $params['prep_time'] === '' || $params['prep_time'] === null) {
-            return Failure::make(__('Prep time is required.', 'plugixa-recipe'));
-        }
-
-        if (!isset($params['cook_time']) || $params['cook_time'] === '' || $params['cook_time'] === null) {
-            return Failure::make(__('Cook time is required.', 'plugixa-recipe'));
-        }
-
-        $ingredients_check = $params['ingredients'] ?? [];
-        $has_ingredient = false;
-        if (is_array($ingredients_check)) {
-            foreach ($ingredients_check as $ing) {
-                if (!empty(trim($ing['name'] ?? ''))) { $has_ingredient = true; break; }
-            }
-        }
-        if (!$has_ingredient) {
-            return Failure::make(__('At least one ingredient is required.', 'plugixa-recipe'));
-        }
-
-        $instructions_check = $params['instructions'] ?? [];
-        $has_instruction = false;
-        if (is_array($instructions_check)) {
-            foreach ($instructions_check as $inst) {
-                // Accept every shape the write path below accepts (see the insert's
-                // 'instruction_text' => $inst['instruction_text'] ?? $inst['text']). Checking
-                // only one key made this gate stricter than the writer behind it, so a payload
-                // using the column's own name was rejected as "no instructions" even though it
-                // would have saved correctly.
-                $text = is_string($inst) ? $inst : ($inst['instruction_text'] ?? $inst['text'] ?? '');
-                if ('' !== trim($text)) { $has_instruction = true; break; }
-            }
-        }
-        if (!$has_instruction) {
-            return Failure::make(__('At least one instruction is required.', 'plugixa-recipe'));
-        }
 
         $status = $this->requested_status($params) ?? 'draft';
         if (!in_array($status, self::STATUSES, true)) {
@@ -320,8 +271,8 @@ final class RecipeService {
             'tips'             => wp_kses_post($params['tips'] ?? ''),
             'image_id'         => !empty($params['image_id']) ? (int) $params['image_id'] : null,
             'gallery'          => !empty($params['gallery']) ? wp_json_encode($params['gallery']) : null,
-            'tags'             => !empty($params['tags']) ? wp_json_encode($params['tags']) : null,
-            'equipment'        => !empty($params['equipment']) ? wp_json_encode($params['equipment']) : null,
+            'tags'             => $this->encode_labels($params['tags'] ?? null),
+            'equipment'        => $this->equipment_column($params),
             'video_url'        => esc_url_raw($params['video_url'] ?? ''),
             'servings'         => (int) ($params['servings'] ?? 4),
             'servings_unit'    => sanitize_text_field($params['servings_unit'] ?? 'servings'),
@@ -331,7 +282,7 @@ final class RecipeService {
             'cook_time'        => isset($params['cook_time']) ? (int) $params['cook_time'] : null,
             'rest_time'        => isset($params['rest_time']) ? (int) $params['rest_time'] : null,
             'difficulty'       => sanitize_text_field($params['difficulty'] ?? 'medium'),
-            'cost'             => sanitize_text_field($params['cost'] ?? 'moderate'),
+            'cost'             => Enums::cost($params['cost'] ?? 'moderate'),
             'season'           => sanitize_text_field($params['season'] ?? ''),
             'status'           => $status,
             'is_featured'      => (int) ($params['is_featured'] ?? 0),
@@ -414,6 +365,205 @@ final class RecipeService {
     }
 
     /**
+     * The fields a recipe must hold before it may be saved with this status.
+     *
+     * create() and update() both ask (see unmet() for how an update applies the answer).
+     * A title is always required, listed here or not.
+     *
+     * Field names: title, description, image, category, difficulty, servings, prep_time,
+     * cook_time, ingredient, instruction.
+     *
+     * @param string $status One of STATUSES - the status the recipe will have after the save.
+     * @return string[]
+     */
+    private function required_for(string $status): array {
+        // TODO(owner): decide what a draft / pending / published / archived recipe needs.
+        // Returning the full list for every status keeps today's create() rule.
+        return ['title', 'description', 'image', 'category', 'difficulty', 'servings', 'prep_time', 'cook_time', 'ingredient', 'instruction'];
+    }
+
+    /**
+     * The first required field the payload leaves empty, as a refusal; null when none is.
+     *
+     * The order is fixed and decides the message the editor sees: title, description, image,
+     * category, difficulty, servings, prep time, cook time, ingredient, instruction. A title
+     * is required whatever $required says - the slug is made from it.
+     *
+     * On create every required field is checked. On update ($all false) only the fields the
+     * payload SENDS are: an update changes what it names and leaves the rest alone, so a
+     * small edit to a recipe that was imported without an image must still go through. What
+     * it may not do is send a required field empty - `ingredients: []` used to be stored,
+     * and the recipe lost its ingredient list.
+     *
+     * @param mixed    $params   The decoded JSON payload.
+     * @param string[] $required Field names, from required_for().
+     * @param bool     $all      True on create.
+     */
+    private function unmet($params, array $required, bool $all): ?WP_Error {
+        $params     = is_array($params) ? $params : [];
+        $required[] = 'title';
+
+        $has = static function (string $key) use ($params): bool {
+            return array_key_exists($key, $params);
+        };
+        $asked = static function (string $field, string $key) use ($required, $all, $has): bool {
+            return in_array($field, $required, true) && ($all || $has($key));
+        };
+        $refuse = static function (string $key, string $message): WP_Error {
+            return Failure::make($message, 400, [$key => $message]);
+        };
+
+        if ($asked('title', 'title') && '' === sanitize_text_field((string) ($params['title'] ?? ''))) {
+            return $refuse('title', __('Title is required.', 'plugixa-recipe'));
+        }
+
+        if ($asked('description', 'description') && '' === trim(wp_strip_all_tags(wp_kses_post((string) ($params['description'] ?? ''))))) {
+            return $refuse('description', __('Description is required.', 'plugixa-recipe'));
+        }
+
+        if ($asked('image', 'image_id') && (int) ($params['image_id'] ?? 0) < 1) {
+            return $refuse('image_id', __('Recipe image is required.', 'plugixa-recipe'));
+        }
+
+        if ($asked('category', 'category_ids')) {
+            $categories = $params['category_ids'] ?? [];
+            if (!is_array($categories) || count(array_filter($categories)) < 1) {
+                return $refuse('category_ids', __('At least one category is required.', 'plugixa-recipe'));
+            }
+        }
+
+        if ($asked('difficulty', 'difficulty') && !in_array(sanitize_text_field((string) ($params['difficulty'] ?? '')), Enums::DIFFICULTIES, true)) {
+            return $refuse('difficulty', __('Difficulty is required.', 'plugixa-recipe'));
+        }
+
+        if ($asked('servings', 'servings') && (int) ($params['servings'] ?? 0) < 1) {
+            return $refuse('servings', __('Servings must be at least 1.', 'plugixa-recipe'));
+        }
+
+        if ($asked('prep_time', 'prep_time') && (!isset($params['prep_time']) || '' === $params['prep_time'])) {
+            return $refuse('prep_time', __('Prep time is required.', 'plugixa-recipe'));
+        }
+
+        if ($asked('cook_time', 'cook_time') && (!isset($params['cook_time']) || '' === $params['cook_time'])) {
+            return $refuse('cook_time', __('Cook time is required.', 'plugixa-recipe'));
+        }
+
+        if ($asked('ingredient', 'ingredients')) {
+            $named = false;
+            foreach (is_array($params['ingredients'] ?? null) ? $params['ingredients'] : [] as $ing) {
+                if (is_array($ing) && '' !== trim((string) ($ing['name'] ?? ''))) {
+                    $named = true;
+                    break;
+                }
+            }
+            if (!$named) {
+                return $refuse('ingredients', __('At least one ingredient is required.', 'plugixa-recipe'));
+            }
+        }
+
+        if ($asked('instruction', 'instructions')) {
+            $written = false;
+            foreach (is_array($params['instructions'] ?? null) ? $params['instructions'] : [] as $inst) {
+                // Every shape ChildRows::instruction() stores: a bare string, `instruction_text`
+                // or `text`. A gate stricter than the writer behind it refuses what would save.
+                $step = is_string($inst) ? $inst : (is_array($inst) ? ($inst['instruction_text'] ?? $inst['text'] ?? '') : '');
+                if ('' !== trim((string) $step)) {
+                    $written = true;
+                    break;
+                }
+            }
+            if (!$written) {
+                return $refuse('instructions', __('At least one instruction is required.', 'plugixa-recipe'));
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * A refusal from another module, asked before anything is written.
+     *
+     * A module that stores data of its own with a recipe (through the
+     * plugixa_recipe_save_recipe action) had no way to refuse a save: by the time that
+     * action fires the recipe is already written. This filter is that way.
+     *
+     * @param mixed $params The decoded JSON payload.
+     * @param int   $id     The recipe being updated; 0 on create.
+     */
+    private function refused_elsewhere($params, int $id): ?WP_Error {
+        /**
+         * Filters whether a recipe save may go ahead.
+         *
+         * Return a WP_Error (see Core\Http\Failure::make(), which carries a per-field
+         * `errors` map) to refuse it; return the value received to let it through.
+         *
+         * @param WP_Error|null       $refusal   Null unless an earlier listener refused.
+         * @param array<string,mixed> $params    The request payload, unsanitised.
+         * @param int                 $recipe_id 0 when the recipe is being created.
+         */
+        $refusal = apply_filters('plugixa_recipe_validate_recipe', null, is_array($params) ? $params : [], $id);
+
+        return $refusal instanceof WP_Error ? $refusal : null;
+    }
+
+    /**
+     * A difficulty, cost or season the payload names that is not one of ours.
+     *
+     * Refused rather than stored: these are varchars, so an unknown value would be kept and
+     * then open in the editor as a choice its own list does not contain. An empty cost or
+     * season means "not chosen".
+     *
+     * @param mixed $params The decoded JSON payload.
+     */
+    private function refused_choice($params): ?WP_Error {
+        if (isset($params['difficulty']) && !in_array(sanitize_text_field((string) $params['difficulty']), Enums::DIFFICULTIES, true)) {
+            return Failure::make(__('Invalid difficulty.', 'plugixa-recipe'));
+        }
+
+        if (isset($params['cost']) && '' !== (string) $params['cost'] && '' === Enums::cost($params['cost'])) {
+            return Failure::make(__('Invalid cost.', 'plugixa-recipe'));
+        }
+
+        if (isset($params['season']) && '' !== (string) $params['season'] && !in_array(sanitize_text_field((string) $params['season']), Enums::SEASONS, true)) {
+            return Failure::make(__('Invalid season.', 'plugixa-recipe'));
+        }
+
+        return null;
+    }
+
+    /**
+     * The equipment column for a save. `equipment_items` ({name, link_url} each) is the
+     * fuller shape and wins when both are sent; `equipment` is the plain list of names.
+     *
+     * @param mixed $params The decoded JSON payload.
+     */
+    private function equipment_column($params): ?string {
+        return Equipment::encode($params['equipment_items'] ?? $params['equipment'] ?? null);
+    }
+
+    /**
+     * A list of tags as the row stores it: plain text, no blanks, no repeats. Null when
+     * nothing is left.
+     *
+     * @param mixed $labels Raw input.
+     */
+    private function encode_labels($labels): ?string {
+        if (!is_array($labels)) {
+            return null;
+        }
+
+        $clean = [];
+        foreach ($labels as $label) {
+            $label = is_scalar($label) ? sanitize_text_field((string) $label) : '';
+            if ('' !== $label && !in_array($label, $clean, true)) {
+                $clean[] = $label;
+            }
+        }
+
+        return $clean ? wp_json_encode($clean) : null;
+    }
+
+    /**
      * Change the fields present in $params; fields that are absent are left alone.
      *
      * @param mixed $params The decoded JSON payload: raw, untrusted, null when there was none.
@@ -425,6 +575,16 @@ final class RecipeService {
         $existing = $this->recipes->find_uncached($id);
         if (null === $existing) {
             return Failure::make(__('Recipe not found.', 'plugixa-recipe'), 404);
+        }
+
+        $unmet = $this->unmet($params, $this->required_for($this->requested_status($params) ?? (string) $existing['status']), false);
+        if (null !== $unmet) {
+            return $unmet;
+        }
+
+        $refused = $this->refused_choice($params) ?? $this->refused_elsewhere($params, $id);
+        if (null !== $refused) {
+            return $refused;
         }
 
         $data = [];
@@ -450,7 +610,16 @@ final class RecipeService {
             $data['status'] = $status;
         }
 
-        $html_fields = ['description', 'excerpt', 'notes', 'tips', 'seo_description'];
+        if (isset($data['cost'])) {
+            $data['cost'] = Enums::cost($data['cost']);
+        }
+
+        // Plain text, as create() stores it: a meta description holds no markup.
+        if (isset($params['seo_description'])) {
+            $data['seo_description'] = sanitize_textarea_field($params['seo_description']);
+        }
+
+        $html_fields = ['description', 'excerpt', 'notes', 'tips'];
         foreach ($html_fields as $field) {
             if (isset($params[$field])) {
                 $data[$field] = wp_kses_post($params[$field]);
@@ -468,10 +637,10 @@ final class RecipeService {
             $data['gallery'] = !empty($params['gallery']) ? wp_json_encode($params['gallery']) : null;
         }
         if (isset($params['tags'])) {
-            $data['tags'] = !empty($params['tags']) ? wp_json_encode($params['tags']) : null;
+            $data['tags'] = $this->encode_labels($params['tags']);
         }
-        if (isset($params['equipment'])) {
-            $data['equipment'] = !empty($params['equipment']) ? wp_json_encode($params['equipment']) : null;
+        if (isset($params['equipment']) || isset($params['equipment_items'])) {
+            $data['equipment'] = $this->equipment_column($params);
         }
 
         // Handle published_at on status change
@@ -519,9 +688,13 @@ final class RecipeService {
             $this->save_instructions($id, $params['instructions']);
         }
 
-        // Save nutrition
-        if (isset($params['nutrition'])) {
-            $this->save_nutrition($id, $params['nutrition']);
+        // Save nutrition. Sent empty (null) it is cleared: the label had no way back to "none".
+        if (is_array($params) && array_key_exists('nutrition', $params)) {
+            if (empty($params['nutrition'])) {
+                $this->children->delete_nutrition($id);
+            } else {
+                $this->save_nutrition($id, $params['nutrition']);
+            }
         }
 
         /** This filter is documented in create(). */
@@ -748,6 +921,41 @@ final class RecipeService {
     }
 
     /**
+     * What the editor offers while an author types: ingredient names, tags and equipment
+     * this site's recipes already use, most used first.
+     *
+     * @return array{ingredients: string[], tags: string[], equipment: string[]}
+     */
+    public function suggestions(): array {
+        $uses = ['tags' => [], 'equipment' => []];
+
+        foreach ($this->recipes->label_lists(1000) as $row) {
+            foreach (array_keys($uses) as $column) {
+                $labels = json_decode((string) ($row[$column] ?? ''), true);
+                foreach (is_array($labels) ? $labels : [] as $label) {
+                    // An equipment item may be stored as {name, link_url}.
+                    $label = is_array($label) ? ($label['name'] ?? '') : $label;
+                    $label = is_scalar($label) ? trim((string) $label) : '';
+                    if ('' !== $label) {
+                        $uses[$column][$label] = ($uses[$column][$label] ?? 0) + 1;
+                    }
+                }
+            }
+        }
+
+        $top = static function (array $counts): array {
+            arsort($counts);
+            return array_map('strval', array_slice(array_keys($counts), 0, 200));
+        };
+
+        return [
+            'ingredients' => array_values(array_map('strval', $this->recipes->ingredient_names(500))),
+            'tags'        => $top($uses['tags']),
+            'equipment'   => $top($uses['equipment']),
+        ];
+    }
+
+    /**
      * Duplicate a recipe with all related data.
      *
      * @return int|WP_Error The new (duplicated) recipe's id.
@@ -848,17 +1056,7 @@ final class RecipeService {
         $this->children->clear_ingredients($recipe_id);
 
         foreach ($ingredients as $ing) {
-            $this->children->insert_ingredient([
-                'recipe_id'   => $recipe_id,
-                'group_name'  => sanitize_text_field($ing['group_name'] ?? ''),
-                'group_order' => (int) ($ing['group_order'] ?? 0),
-                'sort_order'  => (int) ($ing['sort_order'] ?? 0),
-                'quantity'    => sanitize_text_field($ing['quantity'] ?? ''),
-                'unit'        => sanitize_text_field($ing['unit'] ?? ''),
-                'name'        => sanitize_text_field($ing['name'] ?? ''),
-                'notes'       => sanitize_text_field($ing['notes'] ?? ''),
-                'link_url'    => esc_url_raw($ing['link_url'] ?? ''),
-            ]);
+            $this->children->insert_ingredient(ChildRows::ingredient($recipe_id, $ing));
         }
     }
 
@@ -869,28 +1067,9 @@ final class RecipeService {
     private function save_instructions(int $recipe_id, array $instructions): void {
         $this->children->clear_instructions($recipe_id);
 
+        // ChildRows accepts every shape the create gate accepts, a bare string included.
         foreach ($instructions as $inst) {
-            // The validation gate accepts a bare string as well as an array (see the
-            // is_string() branch beside "At least one instruction is required"), so the
-            // writer has to accept the same shape. It did not: $inst['instruction_text']
-            // on a string is null under isset() semantics, so a string payload inserted a
-            // row with an EMPTY instruction_text and still returned 200 - the step text was
-            // silently discarded. Normalise here so the gate and the writer agree.
-            if (is_string($inst)) {
-                $inst = ['instruction_text' => $inst];
-            }
-
-            $this->children->insert_instruction([
-                'recipe_id'        => $recipe_id,
-                'group_name'       => sanitize_text_field($inst['group_name'] ?? ''),
-                'group_order'      => (int) ($inst['group_order'] ?? 0),
-                'sort_order'       => (int) ($inst['sort_order'] ?? 0),
-                'title'            => sanitize_text_field($inst['title'] ?? ''),
-                'instruction_text' => wp_kses_post($inst['instruction_text'] ?? $inst['text'] ?? ''),
-                'image_id'         => !empty($inst['image_id']) ? (int) $inst['image_id'] : null,
-                'video_url'        => esc_url_raw($inst['video_url'] ?? ''),
-                'duration'         => isset($inst['duration']) ? (int) $inst['duration'] : null,
-            ]);
+            $this->children->insert_instruction(ChildRows::instruction($recipe_id, $inst));
         }
     }
 

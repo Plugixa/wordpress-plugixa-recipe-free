@@ -37,6 +37,19 @@ final class Strings {
             'pending'        => __('Pending', 'plugixa-recipe'),
             'archived'       => __('Archived', 'plugixa-recipe'),
             'featured'       => __('Featured', 'plugixa-recipe'),
+
+            // Shared pickers and cards (src/shared).
+            'collapse'             => __('Collapse', 'plugixa-recipe'),
+            'expand'               => __('Expand', 'plugixa-recipe'),
+            'gallery_add'          => __('Add Images', 'plugixa-recipe'),
+            'gallery_image'        => __('Gallery image', 'plugixa-recipe'),
+            'gallery_remove'       => __('Remove image', 'plugixa-recipe'),
+            'gallery_reorder_hint' => __('Drag to reorder, or press Space and use the arrow keys.', 'plugixa-recipe'),
+            'picker_add'           => __('Add', 'plugixa-recipe'),
+            'picker_create_failed' => __('It could not be added.', 'plugixa-recipe'),
+            'picker_loading'       => __('Searching...', 'plugixa-recipe'),
+            'picker_none'          => __('Nothing found', 'plugixa-recipe'),
+            'picker_placeholder'   => __('Type to search', 'plugixa-recipe'),
         ];
     }
 }

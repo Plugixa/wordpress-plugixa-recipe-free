@@ -222,6 +222,10 @@ final class Columns {
             'name',
             'notes',
             'link_url',
+            'amount',
+            'amount_max',
+            'is_optional',
+            'substitution',
         ] );
     }
 
@@ -243,6 +247,8 @@ final class Columns {
             'image_id',
             'video_url',
             'duration',
+            'timer_seconds',
+            'tip',
         ] );
     }
 

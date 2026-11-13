@@ -298,30 +298,12 @@ class Assets {
         );
     }
 
-    private function get_initial_route(): string {
-        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only page routing, no state change.
-        $page = isset($_GET['page']) ? sanitize_text_field(wp_unslash($_GET['page'])) : 'plugixa-recipe';
-
-        $routes = [
-            'plugixa-recipe'              => '/dashboard',
-            'plugixa-recipe-recipes'      => '/recipes',
-            'plugixa-recipe-categories'   => '/categories',
-            'plugixa-recipe-cuisines'     => '/cuisines',
-            'plugixa-recipe-reviews'      => '/reviews',
-            'plugixa-recipe-collections'  => '/collections',
-            'plugixa-recipe-views'        => '/views',
-            'plugixa-recipe-shortcodes'   => '/shortcodes',
-            'plugixa-recipe-settings'     => '/settings',
-        ];
-
-        return $routes[$page] ?? '/dashboard';
-    }
-
     private function inject_config(): void {
         $current_user = wp_get_current_user();
 
         $config = [
-            'initialRoute' => $this->get_initial_route(),
+            // Used only when the URL carries no route of its own (see main.tsx).
+            'initialRoute' => '/dashboard',
             'apiUrl'       => esc_url_raw(rest_url('plugixa-recipe/v1/')),
             'adminUrl'     => esc_url(admin_url()),
             'pluginUrl'    => esc_url($this->plugin_url),

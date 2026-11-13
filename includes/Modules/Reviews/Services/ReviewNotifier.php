@@ -65,7 +65,7 @@ final class ReviewNotifier {
             '{review_text}'  => $review_data['review_text'] ?? '',
             '{site_name}'    => get_bloginfo('name'),
             '{site_url}'     => home_url(),
-            '{admin_url}'    => admin_url('admin.php?page=plugixa-recipe-reviews'),
+            '{admin_url}'    => admin_url('admin.php?page=plugixa-recipe#/reviews'),
             '{date}'         => wp_date(get_option('date_format') . ' ' . get_option('time_format')),
         ];
 
@@ -81,7 +81,7 @@ final class ReviewNotifier {
                 __('Rating', 'plugixa-recipe')  => $stars . ' (' . $rating . '/5)',
                 __('Review', 'plugixa-recipe')  => $placeholders['{review_text}'],
             ],
-            admin_url('admin.php?page=plugixa-recipe-reviews'),
+            admin_url('admin.php?page=plugixa-recipe#/reviews'),
             __('View All Reviews', 'plugixa-recipe')
         );
 

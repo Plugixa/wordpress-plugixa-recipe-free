@@ -17,7 +17,8 @@ defined( 'ABSPATH' ) || exit;
  * wp_kses() with the allowlist below at output time. The list is the union of what
  * post content may contain ('content' context) and the vocabulary the plugin's own
  * templates emit: recipe cards, the servings adjuster, the nutrition label, the
- * review form, inline SVG icons, and the schema.org Recipe microdata attributes.
+ * review form, inline SVG icons, and the microdata attributes a child theme's copy of
+ * a 1.0.0 template still carries.
  *
  * Deliberately absent: <script> and <style>. Scripts go through
  * wp_print_inline_script_tag() or an enqueue; per-instance styling travels as
@@ -121,9 +122,9 @@ final class Kses {
         // must be named, or it is silently stripped - which would quietly destroy the
         // accessibility of the rendered output while the markup still looked fine.
         //
-        // itemprop / itemscope / itemtype carry the schema.org Recipe microdata that the
-        // free build emits (the JSON-LD is premium); dropping them would remove the
-        // plugin's structured data from every page.
+        // itemprop / itemscope / itemtype: our own views carry no microdata since 1.0.1
+        // (the Schema module's JSON-LD describes the page), but a child theme's copy of a
+        // 1.0.0 view does, and stripping them there would take that site's rich results.
         $global_attrs = [
             'id' => true, 'class' => true, 'style' => true, 'role' => true,
             'title' => true, 'tabindex' => true, 'hidden' => true, 'lang' => true, 'dir' => true,

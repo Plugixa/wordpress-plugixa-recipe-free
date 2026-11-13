@@ -33,7 +33,7 @@ final class Module extends AbstractModule {
     public function labels(): array {
         return [
             'label'       => __('Collections', 'plugixa-recipe'),
-            'description' => __('Hand-picked groups of recipes, each with its own page.', 'plugixa-recipe'),
+            'description' => __('Hand-picked groups of recipes: collections, cookbooks and meal plans.', 'plugixa-recipe'),
         ];
     }
 

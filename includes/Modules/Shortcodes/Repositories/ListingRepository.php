@@ -10,6 +10,7 @@ namespace PlugixaRecipe\Modules\Shortcodes\Repositories;
 // phpcs:disable WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- This sniff counts prepare() arguments syntactically and cannot see through the spread operator, so the `...$args` listing queries report "found 1 replacement, expected 23". The values are passed in one pre-built positional array (see $args above the call, table identifiers included) precisely so the SQL can stay a constant literal. This is an argument-counting warning, not a security sniff.
 
 use PlugixaRecipe\Core\Database\Repository;
+use PlugixaRecipe\Modules\Recipes\DietFlags;
 
 defined('ABSPATH') || exit;
 
@@ -104,14 +105,23 @@ final class ListingRepository extends Repository {
      * @param mixed    $orderby       A recipes column from the caller's allow-list.
      * @param string   $order         'ASC' or 'DESC'.
      * @param int      $limit         PHP_INT_MAX for unlimited.
+     * @param int      $max_time      Longest total time in minutes, 0 for any. A recipe with
+     *                                no time set is NOT "ready in 30 minutes": it is left out.
+     * @param string   $diet          A diet flag column (DietFlags), '' for any.
      * @param string   $search        A visitor's search words, '' for none. Matched against
      *                                the title and the description.
      * @return mixed The list of rows (ARRAY_A) - cached, except for a search.
      */
-    public function published(int $featured, float $min_rating, string $difficulty, $lang, array $cat_slugs, array $cuisine_slugs, array $course_slugs, $orderby, string $order, int $limit, int $offset, string $search = '') {
+    public function published(int $featured, float $min_rating, string $difficulty, $lang, array $cat_slugs, array $cuisine_slugs, array $course_slugs, $orderby, string $order, int $limit, int $offset, string $search = '', int $max_time = 0, string $diet = '') {
         global $wpdb;
 
         $like = '' !== $search ? '%' . $wpdb->esc_like($search) . '%' : '';
+
+        // A diet is a COLUMN (is_vegan...). It is bound as an identifier, so it must be one of
+        // ours whoever the caller is; with no diet asked for the gate is off and the column
+        // bound in its place is never looked at.
+        $diet_on     = isset(DietFlags::labels()[$diet]);
+        $diet_column = $diet_on ? $diet : 'is_featured';
 
         $cat_list     = implode(',', $cat_slugs);
         $cuisine_list = implode(',', $cuisine_slugs);
@@ -130,6 +140,8 @@ final class ListingRepository extends Repository {
             $cuisine_slugs ? 1 : 0, $this->table('recipe_cuisines'), $this->table('cuisines'), $cuisine_list,
             $course_slugs ? 1 : 0, $this->table('recipe_courses'), $this->table('courses'), $course_list,
             '' !== $search ? 1 : 0, $like, $like,
+            $max_time > 0 ? 1 : 0, $max_time,
+            $diet_on ? 1 : 0, $diet_column,
             $orderby,
             $limit,
             $offset,
@@ -171,6 +183,8 @@ final class ListingRepository extends Repository {
                         AND ( %d = 0 OR EXISTS (SELECT 1 FROM %i rco INNER JOIN %i co ON rco.course_id = co.id
                                                  WHERE rco.recipe_id = r.id AND FIND_IN_SET(co.slug, %s)) )
                         AND ( %d = 0 OR r.title LIKE %s OR r.description LIKE %s )
+                        AND ( %d = 0 OR ( r.total_time > 0 AND r.total_time <= %d ) )
+                        AND ( %d = 0 OR r.%i = 1 )
                       ORDER BY r.%i ASC, r.id ASC
                       LIMIT %d OFFSET %d',
                     ...$args
@@ -202,6 +216,8 @@ final class ListingRepository extends Repository {
                     AND ( %d = 0 OR EXISTS (SELECT 1 FROM %i rco INNER JOIN %i co ON rco.course_id = co.id
                                              WHERE rco.recipe_id = r.id AND FIND_IN_SET(co.slug, %s)) )
                     AND ( %d = 0 OR r.title LIKE %s OR r.description LIKE %s )
+                    AND ( %d = 0 OR ( r.total_time > 0 AND r.total_time <= %d ) )
+                    AND ( %d = 0 OR r.%i = 1 )
                   ORDER BY r.%i DESC, r.id DESC
                   LIMIT %d OFFSET %d',
                 ...$args

@@ -551,7 +551,9 @@ class ListingShortcode {
             $order,
             $limit,
             $offset,
-            $search
+            $search,
+            max(0, (int) ($config['max_time'] ?? 0)),
+            sanitize_key((string) ($config['diet'] ?? ''))
         );
 
         if (empty($results)) {
@@ -776,10 +778,9 @@ class ListingShortcode {
     /**
      * Apply what a visitor asked for through [plugixa_recipe_search].
      *
-     * That widget is a GET form with three fields - plugixa_recipe_search,
-     * plugixa_recipe_category, plugixa_recipe_cuisine - and until now nothing read them: the
-     * box submitted, the page reloaded, and the listing on it was unchanged. A listing now
-     * narrows itself to them, on whichever page the form points at.
+     * That widget is a GET form: words, a category, a cuisine, a course, a difficulty, a
+     * longest "ready in" and a diet (VisitorFilters reads and narrows all seven). A
+     * listing narrows itself to them, on whichever page the form points at.
      *
      * The values are folded into the config rather than read at query time, because the
      * config is what the "load more" / pagination request gets back from its transient:
@@ -788,26 +789,17 @@ class ListingShortcode {
      * A visitor can only NARROW a listing. A category outside the ones the shortcode was
      * limited to returns nothing rather than widening it.
      *
-     * No nonce: this is a read-only filter on public content, the same as core's own `s`
-     * parameter, and a nonce would break every bookmarked or shared search link.
-     *
      * @param array<string, mixed> $config
      * @return array<string, mixed>
      */
     private function with_visitor_search(array $config): array {
-        // phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only public filter; see the docblock above.
-        $search   = isset($_GET['plugixa_recipe_search']) && is_scalar($_GET['plugixa_recipe_search']) ? sanitize_text_field(wp_unslash((string) $_GET['plugixa_recipe_search'])) : '';
-        $narrowed = [
-            'categories' => isset($_GET['plugixa_recipe_category']) && is_scalar($_GET['plugixa_recipe_category']) ? sanitize_title(wp_unslash((string) $_GET['plugixa_recipe_category'])) : '',
-            'cuisines'   => isset($_GET['plugixa_recipe_cuisine']) && is_scalar($_GET['plugixa_recipe_cuisine']) ? sanitize_title(wp_unslash((string) $_GET['plugixa_recipe_cuisine'])) : '',
-        ];
-        // phpcs:enable WordPress.Security.NonceVerification.Recommended
+        $asked = VisitorFilters::read();
 
-        if ('' !== $search) {
-            $config['search'] = mb_substr($search, 0, 100);
+        if ('' !== $asked['search']) {
+            $config['search'] = $asked['search'];
         }
 
-        foreach ($narrowed as $taxonomy => $slug) {
+        foreach (['categories' => $asked['category'], 'cuisines' => $asked['cuisine'], 'courses' => $asked['course']] as $taxonomy => $slug) {
             if ('' === $slug) {
                 continue;
             }
@@ -817,6 +809,23 @@ class ListingShortcode {
                 continue;
             }
             $config[$taxonomy] = $slug;
+        }
+
+        // A listing already limited to one difficulty cannot be asked for another.
+        if ('' !== $asked['difficulty']) {
+            $own = sanitize_key((string) ($config['difficulty'] ?? ''));
+            if ('' !== $own && $own !== $asked['difficulty']) {
+                $config['no_results'] = true;
+            }
+            $config['difficulty'] = $asked['difficulty'];
+        }
+
+        // The listing has no time or diet limit of its own, so these two only ever narrow.
+        if ($asked['max_time'] > 0) {
+            $config['max_time'] = $asked['max_time'];
+        }
+        if ('' !== $asked['diet']) {
+            $config['diet'] = $asked['diet'];
         }
 
         return $config;

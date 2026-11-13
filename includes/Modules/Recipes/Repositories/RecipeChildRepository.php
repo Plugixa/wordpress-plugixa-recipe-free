@@ -147,6 +147,13 @@ final class RecipeChildRepository extends Repository {
         $wpdb->insert($this->table('nutrition'), $data);
     }
 
+    /** Remove a recipe's nutrition row, when a save sends the nutrition empty. */
+    public function delete_nutrition(int $recipe_id): void {
+        global $wpdb;
+
+        $wpdb->delete($this->table('nutrition'), ['recipe_id' => $recipe_id]);
+    }
+
     /**
      * Copy a recipe's pivots, ingredients, instructions and nutrition onto its duplicate.
      *
@@ -188,8 +195,8 @@ final class RecipeChildRepository extends Repository {
 
         // Copy ingredients
         $wpdb->query($wpdb->prepare(
-            'INSERT INTO %i (recipe_id, group_name, group_order, sort_order, quantity, unit, name, notes, link_url)
-            SELECT %d, group_name, group_order, sort_order, quantity, unit, name, notes, link_url FROM %i WHERE recipe_id = %d',
+            'INSERT INTO %i (recipe_id, group_name, group_order, sort_order, quantity, unit, name, notes, link_url, amount, amount_max, is_optional, substitution)
+            SELECT %d, group_name, group_order, sort_order, quantity, unit, name, notes, link_url, amount, amount_max, is_optional, substitution FROM %i WHERE recipe_id = %d',
             $this->table('ingredients'),
             $new_id,
             $this->table('ingredients'),
@@ -198,8 +205,8 @@ final class RecipeChildRepository extends Repository {
 
         // Copy instructions
         $wpdb->query($wpdb->prepare(
-            'INSERT INTO %i (recipe_id, group_name, group_order, sort_order, title, instruction_text, image_id, video_url, duration)
-            SELECT %d, group_name, group_order, sort_order, title, instruction_text, image_id, video_url, duration FROM %i WHERE recipe_id = %d',
+            'INSERT INTO %i (recipe_id, group_name, group_order, sort_order, title, instruction_text, image_id, video_url, duration, timer_seconds, tip)
+            SELECT %d, group_name, group_order, sort_order, title, instruction_text, image_id, video_url, duration, timer_seconds, tip FROM %i WHERE recipe_id = %d',
             $this->table('instructions'),
             $new_id,
             $this->table('instructions'),

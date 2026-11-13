@@ -7,6 +7,7 @@ namespace PlugixaRecipe\Modules\Recipes;
 
 // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- Schema installer for the tables this module owns: direct queries run on activation and on the migration self-heal, so there is nothing to cache, and CREATE/ALTER TABLE is the purpose of the file. None of these three is a security sniff. The security SQL sniffs are NOT disabled file-wide - they are disabled only around create_tables(), which says why.
 
+use PlugixaRecipe\Core\Database\Cache;
 use PlugixaRecipe\Core\Database\Schema as Tables;
 
 defined('ABSPATH') || exit;
@@ -37,6 +38,7 @@ final class Schema {
         Tables::forget();
         self::upgrade();
         self::seed($created);
+        self::top_up_units();
     }
 
     // phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- CREATE TABLE only. The table name alone could bind with %i, but get_charset_collate() cannot: it is SQL syntax (DEFAULT CHARACTER SET x COLLATE y) that is empty on some installs, so it is neither a value nor an identifier. Both interpolated parts come from $wpdb itself; no request data reaches these statements. Scoped to this method on purpose: everything outside it binds with %i / %s, and SqlLiteralTest fails the build if that stops being true.
@@ -85,6 +87,7 @@ final class Schema {
             rating_count int unsigned DEFAULT 0,
             like_count int unsigned NOT NULL DEFAULT 0,
             enable_schema tinyint(1) NOT NULL DEFAULT 1,
+            canonical_post_id bigint(20) unsigned DEFAULT NULL,
             seo_score tinyint unsigned DEFAULT NULL,
             seo_title varchar(200) DEFAULT NULL,
             seo_description text DEFAULT NULL,
@@ -126,6 +129,10 @@ final class Schema {
             name varchar(500) NOT NULL,
             notes varchar(500) DEFAULT NULL,
             link_url varchar(500) DEFAULT NULL,
+            amount decimal(10,3) DEFAULT NULL,
+            amount_max decimal(10,3) DEFAULT NULL,
+            is_optional tinyint(1) NOT NULL DEFAULT 0,
+            substitution varchar(500) DEFAULT NULL,
             PRIMARY KEY (id),
             KEY recipe_id (recipe_id),
             KEY sort_order (recipe_id, group_order, sort_order)
@@ -142,6 +149,8 @@ final class Schema {
             image_id bigint(20) unsigned DEFAULT NULL,
             video_url varchar(500) DEFAULT NULL,
             duration int unsigned DEFAULT NULL,
+            timer_seconds int unsigned DEFAULT NULL,
+            tip text DEFAULT NULL,
             PRIMARY KEY (id),
             KEY recipe_id (recipe_id),
             KEY sort_order (recipe_id, group_order, sort_order)
@@ -201,6 +210,7 @@ final class Schema {
         global $wpdb;
 
         $recipes_table      = Tables::table('recipes');
+        $ingredients_table  = Tables::table('ingredients');
         $instructions_table = Tables::table('instructions');
 
         // Migration: add title column to instructions
@@ -277,6 +287,59 @@ final class Schema {
         // Migration: add submission_ip column to recipes for tracking frontend submissions.
         if (!in_array('submission_ip', $recipe_cols, true)) {
             $wpdb->query($wpdb->prepare('ALTER TABLE %i ADD COLUMN submission_ip varchar(45) DEFAULT NULL AFTER created_by', $recipes_table));
+        }
+
+        // Migration: what the recipe editor can now record about an ingredient. `amount` and
+        // `amount_max` are the quantity as numbers (the server derives them from the text
+        // `quantity` on every save - see Services\Quantity), for scaling and unit conversion.
+        $ingredient_cols = $wpdb->get_col($wpdb->prepare('DESCRIBE %i', $ingredients_table), 0);
+        if (!in_array('amount', $ingredient_cols, true)) {
+            $wpdb->query($wpdb->prepare('ALTER TABLE %i ADD COLUMN amount decimal(10,3) DEFAULT NULL AFTER link_url', $ingredients_table));
+            // Only the quantities that are already plain numbers. A fraction or a range stays
+            // NULL until the recipe is next saved; a reader treats NULL as "read the text".
+            $wpdb->query($wpdb->prepare("UPDATE %i SET amount = CAST(quantity AS DECIMAL(10,3)) WHERE quantity REGEXP '^[0-9]+([.][0-9]+)?$'", $ingredients_table));
+        }
+        if (!in_array('amount_max', $ingredient_cols, true)) {
+            $wpdb->query($wpdb->prepare('ALTER TABLE %i ADD COLUMN amount_max decimal(10,3) DEFAULT NULL AFTER amount', $ingredients_table));
+        }
+        if (!in_array('is_optional', $ingredient_cols, true)) {
+            $wpdb->query($wpdb->prepare('ALTER TABLE %i ADD COLUMN is_optional tinyint(1) NOT NULL DEFAULT 0 AFTER amount_max', $ingredients_table));
+        }
+        if (!in_array('substitution', $ingredient_cols, true)) {
+            $wpdb->query($wpdb->prepare('ALTER TABLE %i ADD COLUMN substitution varchar(500) DEFAULT NULL AFTER is_optional', $ingredients_table));
+        }
+
+        // Migration: a step's timer in seconds, beside `duration` (whole minutes, which export
+        // files and child themes already read), and a tip. The backfill runs once, with the
+        // column: a timer the author later clears must stay cleared.
+        $instruction_cols = $wpdb->get_col($wpdb->prepare('DESCRIBE %i', $instructions_table), 0);
+        if (!in_array('timer_seconds', $instruction_cols, true)) {
+            $wpdb->query($wpdb->prepare('ALTER TABLE %i ADD COLUMN timer_seconds int unsigned DEFAULT NULL AFTER duration', $instructions_table));
+            $wpdb->query($wpdb->prepare('UPDATE %i SET timer_seconds = duration * 60 WHERE duration IS NOT NULL AND duration > 0', $instructions_table));
+        }
+        if (!in_array('tip', $instruction_cols, true)) {
+            $wpdb->query($wpdb->prepare('ALTER TABLE %i ADD COLUMN tip text DEFAULT NULL AFTER timer_seconds', $instructions_table));
+        }
+
+        // Migration: the post that embeds a recipe whole (Services\CanonicalPosts).
+        $col = $wpdb->get_results($wpdb->prepare('SHOW COLUMNS FROM %i LIKE %s', $recipes_table, $wpdb->esc_like('canonical_post_id')));
+        if (empty($col)) {
+            $wpdb->query($wpdb->prepare('ALTER TABLE %i ADD COLUMN canonical_post_id bigint(20) unsigned DEFAULT NULL AFTER enable_schema', $recipes_table));
+        }
+
+        // Migration: costs stored under the names two earlier writers used (the public form's
+        // `medium`, the AI importer's `low` / `high`) become the editor's own - see Enums.
+        // Runs every time and matches nothing once it has run.
+        $renamed  = (int) $wpdb->query($wpdb->prepare('UPDATE %i SET cost = %s WHERE cost = %s', $recipes_table, 'budget', 'low'));
+        $renamed += (int) $wpdb->query($wpdb->prepare('UPDATE %i SET cost = %s WHERE cost = %s', $recipes_table, 'moderate', 'medium'));
+        $renamed += (int) $wpdb->query($wpdb->prepare('UPDATE %i SET cost = %s WHERE cost = %s', $recipes_table, 'expensive', 'high'));
+
+        // Migration: origin marks out of the credit column (Enums::ORIGIN_MARKS). Only the
+        // two that nothing reads; the other two are how an earlier import is still
+        // recognised, and the presenter keeps them off the page. Matches nothing once run.
+        $renamed += (int) $wpdb->query($wpdb->prepare('UPDATE %i SET source = %s WHERE source IN ( %s, %s )', $recipes_table, '', 'form', 'ai'));
+        if ($renamed > 0) {
+            Cache::flush('recipes');
         }
     }
 
@@ -356,8 +419,58 @@ final class Schema {
             ['name' => 'Clove', 'abbreviation' => 'clove', 'system' => 'metric', 'type' => 'count', 'conversion_factor' => 1.0],
         ];
 
-        foreach ($units as $unit) {
+        foreach (array_merge($units, self::count_units()) as $unit) {
             $wpdb->insert($table, $unit);
         }
+    }
+
+    /**
+     * The count units the public form offered from a list of its own, which the table never
+     * held. The form reads the table now, so the table has to hold them.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private static function count_units(): array {
+        return [
+            ['name' => 'Slice', 'abbreviation' => 'slice', 'system' => 'metric', 'type' => 'count', 'conversion_factor' => 1.0],
+            ['name' => 'Dash', 'abbreviation' => 'dash', 'system' => 'metric', 'type' => 'count', 'conversion_factor' => 1.0],
+            ['name' => 'Can', 'abbreviation' => 'can', 'system' => 'metric', 'type' => 'count', 'conversion_factor' => 1.0],
+            ['name' => 'Bunch', 'abbreviation' => 'bunch', 'system' => 'metric', 'type' => 'count', 'conversion_factor' => 1.0],
+            ['name' => 'Sprig', 'abbreviation' => 'sprig', 'system' => 'metric', 'type' => 'count', 'conversion_factor' => 1.0],
+            ['name' => 'Stick', 'abbreviation' => 'stick', 'system' => 'metric', 'type' => 'count', 'conversion_factor' => 1.0],
+            ['name' => 'Package', 'abbreviation' => 'package', 'system' => 'metric', 'type' => 'count', 'conversion_factor' => 1.0],
+        ];
+    }
+
+    /**
+     * Add count_units() to a site seeded before they existed - once.
+     *
+     * The stamp is deliberately the whole guard: this is the one place where "done, and the
+     * result is gone" must NOT be repaired. A unit the site owner removed stays removed, and
+     * a table they emptied stays empty.
+     */
+    private static function top_up_units(): void {
+        global $wpdb;
+
+        if (get_option('plugixa_recipe_units_topped_up')) {
+            return;
+        }
+
+        $table = Tables::table('units');
+        if (!$wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->esc_like($table)))) {
+            return;
+        }
+
+        $held = array_map('strtolower', (array) $wpdb->get_col($wpdb->prepare('SELECT abbreviation FROM %i', $table)));
+        if ($held) {
+            foreach (self::count_units() as $unit) {
+                if (!in_array($unit['abbreviation'], $held, true)) {
+                    $wpdb->insert($table, $unit);
+                }
+            }
+            Cache::flush('units');
+        }
+
+        update_option('plugixa_recipe_units_topped_up', 1, false);
     }
 }

@@ -110,6 +110,61 @@ final class SinglePageRepository extends Repository {
     }
 
     /**
+     * One published recipe picked at random, or null when there is none. Never cached:
+     * a cached "random" recipe is the same recipe for everyone.
+     *
+     * @return array{id:string, slug:string}|null
+     */
+    public function random_published(): ?array {
+        global $wpdb;
+
+        $row = $wpdb->get_row($wpdb->prepare(
+            'SELECT id, slug FROM %i WHERE status = \'published\' ORDER BY RAND() LIMIT 1',
+            $this->table('recipes')
+        ), ARRAY_A);
+
+        return $row ?: null;
+    }
+
+    /**
+     * The site's units, for Services\UnitResolver. Cached under `units`, so adding or
+     * correcting a unit reaches the recipe pages.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function units() {
+        global $wpdb;
+
+        return $this->remember_as('units', 'single_units', function () use ($wpdb) {
+            return $wpdb->get_results($wpdb->prepare(
+                'SELECT name, abbreviation, `system`, `type`, conversion_factor FROM %i ORDER BY id ASC',
+                $this->table('units')
+            ), ARRAY_A) ?: [];
+        });
+    }
+
+    /**
+     * Courses (Main, Dessert...) - child rows cached under the owning recipe.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function courses(int $recipe_id) {
+        global $wpdb;
+
+        return $this->remember('single_courses|' . $recipe_id, function () use ($wpdb, $recipe_id) {
+            return $wpdb->get_results($wpdb->prepare(
+                'SELECT co.id, co.name, co.slug FROM %i co
+                 INNER JOIN %i rco ON co.id = rco.course_id
+                 WHERE rco.recipe_id = %d
+                 ORDER BY co.display_order ASC, co.id ASC',
+                $this->table('courses'),
+                $this->table('recipe_courses'),
+                $recipe_id
+            ), ARRAY_A) ?: [];
+        });
+    }
+
+    /**
      * Ingredient rows, in group then sort order — child rows cached under the recipe.
      *
      * @return array<int, array<string, mixed>>
@@ -121,7 +176,7 @@ final class SinglePageRepository extends Repository {
         return $this->remember('single_ingredients|' . $recipe_id, function () use ($wpdb, $ingredients_table, $recipe_id) {
             return $wpdb->get_results($wpdb->prepare(
                 'SELECT id, recipe_id, group_name, group_order, sort_order,
-                    quantity, unit, name, notes, link_url
+                    quantity, unit, name, notes, link_url, amount, amount_max, is_optional, substitution
                   FROM %i
                   WHERE recipe_id = %d
                   ORDER BY group_order ASC, sort_order ASC',
@@ -143,7 +198,7 @@ final class SinglePageRepository extends Repository {
         return $this->remember('single_instructions|' . $recipe_id, function () use ($wpdb, $instructions_table, $recipe_id) {
             return $wpdb->get_results($wpdb->prepare(
                 'SELECT id, recipe_id, group_name, group_order, sort_order,
-                    title, instruction_text, image_id, video_url, duration
+                    title, instruction_text, image_id, video_url, duration, timer_seconds, tip
                   FROM %i
                   WHERE recipe_id = %d
                   ORDER BY group_order ASC, sort_order ASC',

@@ -7,14 +7,173 @@
 /**
  * Recipe Submission Form — Frontend JS
  *
- * Handles tabs, multiselect dropdown, dynamic ingredient/instruction rows,
- * image upload with preview, modal open/close, and AJAX form submission.
+ * Tabs with Back / Next, the category picker, the ingredient and step lists (add, group,
+ * reorder, paste), image uploads with preview, a draft kept in the browser, the modal, and
+ * the submission itself.
+ *
+ * Loaded after two scripts it is built on:
+ *   recipe-text-parser.js  PlugixaRecipeParser - what a pasted line means (shared with the admin editor)
+ *   sortable-list.js       PlugixaRecipeSortable - moving a row by drag, button or key
+ *
+ * Every message shown is in window.plugixaRecipeForm.i18n, printed by the shortcode: the
+ * English text beside each t() call is only what is used if that is missing.
  *
  * @package PlugixaRecipe
  * @since   1.2.0
  */
 (function () {
     'use strict';
+
+    const CONFIG  = window.plugixaRecipeForm || {};
+    const STRINGS = CONFIG.i18n || {};
+    const UNITS   = Array.isArray(CONFIG.units) ? CONFIG.units : [];
+    const PARSER  = window.PlugixaRecipeParser || null;
+    const SORTER  = window.PlugixaRecipeSortable || null;
+    const MAX_STEP_PHOTOS = parseInt(CONFIG.maxStepPhotos, 10) || 8;
+
+    /** A translated message, with %d / %1$d filled from the values given. */
+    function t(key, fallback, ...values) {
+        let next = 0;
+        return String(STRINGS[key] || fallback)
+            .replace(/%(\d+)\$[ds]/g, (_all, position) => String(values[parseInt(position, 10) - 1] ?? ''))
+            .replace(/%[ds]/g, () => String(values[next++] ?? ''));
+    }
+
+    /* ───────────────────────────── RowList ── */
+
+    /**
+     * One of the form's two lists: rows made from <template>s, flat, with heading rows.
+     *
+     * A heading row groups every row under it up to the next heading - the same model the
+     * admin editor uses, so a recipe reads the same way in both. The list never drops below
+     * one item row: removing the last one empties it instead.
+     */
+    class RowList {
+        constructor(container, options) {
+            this.container = container;
+            this.options   = options;
+            const card     = container.closest('.pxr-custom-form-card') || container.parentElement;
+            this.itemTemplate    = card.querySelector(options.itemTemplate);
+            this.headingTemplate = card.querySelector('[data-pxr-heading-template]');
+
+            this.sortable = SORTER ? SORTER.attach(container, {
+                row: '[data-pxr-row]',
+                handle: '[data-pxr-handle]',
+                onChange: () => this.changed(),
+                announce: (position, total) => t('moved', 'Moved to position %1$d of %2$d.', position, total),
+            }) : null;
+
+            container.addEventListener('click', (event) => {
+                const row = event.target.closest('[data-pxr-row]');
+                if (!row || row.parentElement !== container) return;
+
+                if (event.target.closest('[data-pxr-remove-row]')) {
+                    this.remove(row);
+                } else if (event.target.closest('[data-pxr-move]') && this.sortable) {
+                    this.sortable.move(row, parseInt(event.target.closest('[data-pxr-move]').dataset.pxrMove, 10));
+                }
+            });
+
+            this.add('item');
+        }
+
+        rows()  { return Array.from(this.container.children).filter(el => el.matches('[data-pxr-row]')); }
+        items() { return this.rows().filter(row => !row.matches('[data-pxr-heading-row]')); }
+
+        /** Add a row at the end (or after `after`), filled from `values` by input name. */
+        add(kind, values = {}, after = null) {
+            const template = kind === 'group' ? this.headingTemplate : this.itemTemplate;
+            if (!template) return null;
+
+            const row = template.content.firstElementChild.cloneNode(true);
+            Object.keys(values).forEach(name => {
+                const input = row.querySelector(`[name="${name}"]`);
+                if (input) input.value = values[name];
+            });
+
+            this.container.insertBefore(row, after ? after.nextSibling : null);
+            this.changed();
+            return row;
+        }
+
+        remove(row) {
+            const isItem = !row.matches('[data-pxr-heading-row]');
+            if (isItem && this.items().length <= 1) {
+                // The last item is emptied, not removed: the list always has a row to type in.
+                row.querySelectorAll('input:not([type="file"]), textarea').forEach(el => { el.value = ''; });
+                if (this.options.onEmptied) this.options.onEmptied(row);
+            } else {
+                const neighbour = row.previousElementSibling || row.nextElementSibling;
+                row.remove();
+                const focus = neighbour && neighbour.querySelector('input:not([type="file"]), textarea');
+                if (focus) focus.focus();
+            }
+            this.changed();
+        }
+
+        /** Empty the list back to one blank item. */
+        reset() {
+            this.container.textContent = '';
+            this.add('item');
+        }
+
+        /** True while nobody has typed anything: one item, every field empty. */
+        untouched() {
+            const rows = this.rows();
+            return rows.length === 1 && !rows[0].matches('[data-pxr-heading-row]')
+                && Array.from(rows[0].querySelectorAll('input:not([type="file"]), textarea')).every(el => el.value.trim() === '');
+        }
+
+        changed() {
+            let number = 0;
+            this.items().forEach(row => {
+                const badge = row.querySelector('[data-pxr-step-number]');
+                if (badge) badge.textContent = String(++number);
+            });
+            if (this.options.onChange) this.options.onChange();
+        }
+
+        /**
+         * The rows as the request carries them: each item with the group it sits under.
+         * `read(row)` turns one item row into an object, or null to leave it out.
+         */
+        collect(read) {
+            const out = [];
+            let group = '';
+            let groupOrder = 0;
+            let opened = false;
+
+            this.rows().forEach(row => {
+                if (row.matches('[data-pxr-heading-row]')) {
+                    // The first heading keeps group 0 only when nothing came before it.
+                    if (opened || out.length > 0) groupOrder++;
+                    opened = true;
+                    group = row.querySelector('[name="group_heading[]"]').value.trim();
+                    return;
+                }
+                const item = read(row);
+                if (item) out.push(Object.assign(item, { group_name: group, group_order: groupOrder }));
+            });
+
+            return out;
+        }
+
+        /** Everything typed, headings included, for the browser draft. */
+        snapshot() {
+            return this.rows().map(row => {
+                const values = {};
+                row.querySelectorAll('input:not([type="file"]), textarea').forEach(el => { values[el.name] = el.value; });
+                return { kind: row.matches('[data-pxr-heading-row]') ? 'group' : 'item', values };
+            });
+        }
+
+        restore(snapshot) {
+            if (!Array.isArray(snapshot) || snapshot.length === 0) return;
+            this.container.textContent = '';
+            snapshot.forEach(entry => this.add(entry.kind === 'group' ? 'group' : 'item', entry.values || {}));
+            if (this.items().length === 0) this.add('item');
+        }
+    }
 
     /* ───────────────────────────── RecipeSubmissionForm ── */
 
@@ -33,50 +192,85 @@
             if (!this.form) return;
 
             this.maxGalleryImages = 10;
+            // Set while the form is being filled by code (a restore, a reset): not an edit.
+            this.quiet = true;
 
             this.initTabs();
             this.initMultiselect();
-            this.initIngredients();
-            this.initInstructions();
+            this.initLists();
+            this.initPaste();
             this.initImageUpload();
             this.initGallery();
+            this.initDraft();
             this.form.addEventListener('submit', (e) => this.handleSubmit(e));
+            this.form.addEventListener('reset', () => {
+                // resetForm() resets the form itself, which lands here again: `quiet` says so.
+                if (this.quiet) return;
+                // After the browser has emptied the fields.
+                setTimeout(() => { this.resetForm(); this.discardDraft(); }, 0);
+            });
 
-            // Clear field-level error on user input.
-            this.form.addEventListener('input', (e) => {
-                const el = e.target;
-                if (el.classList.contains('pxr-custom-form-input--error')) {
-                    el.classList.remove('pxr-custom-form-input--error');
-                    const errMsg = el.parentElement.querySelector('.pxr-custom-field-error');
-                    if (errMsg) errMsg.remove();
-                }
+            // Clear a field's error as soon as it is corrected, and note the edit for the draft.
+            ['input', 'change'].forEach(type => {
+                this.form.addEventListener(type, (e) => {
+                    this.clearError(e.target);
+                    this.scheduleDraft();
+                });
             });
-            this.form.addEventListener('change', (e) => {
-                const el = e.target;
-                if (el.classList.contains('pxr-custom-form-input--error')) {
-                    el.classList.remove('pxr-custom-form-input--error');
-                    const errMsg = el.parentElement.querySelector('.pxr-custom-field-error');
-                    if (errMsg) errMsg.remove();
-                }
-            });
+
+            this.quiet = false;
+        }
+
+        clearError(el) {
+            if (!el.classList || !el.classList.contains('pxr-custom-form-input--error')) return;
+            el.classList.remove('pxr-custom-form-input--error');
+            el.removeAttribute('aria-invalid');
+            el.removeAttribute('aria-describedby');
+            const errMsg = el.parentElement.querySelector('.pxr-custom-field-error');
+            if (errMsg) errMsg.remove();
         }
 
         /* ── Tabs ── */
 
         initTabs() {
-            const tabs   = this.wrapper.querySelectorAll('[data-pxr-tab]');
-            const panels = this.wrapper.querySelectorAll('[data-pxr-panel]');
-            if (!tabs.length) return;
+            this.tabs = Array.from(this.wrapper.querySelectorAll('[data-pxr-tab]'));
+            if (!this.tabs.length) return;
 
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    tabs.forEach(t => t.classList.remove('pxr-custom-form-tab--active'));
-                    panels.forEach(p => p.classList.remove('pxr-custom-form-panel--active'));
-                    tab.classList.add('pxr-custom-form-tab--active');
-                    const panel = this.wrapper.querySelector(`[data-pxr-panel="${tab.dataset.pxrTab}"]`);
-                    if (panel) panel.classList.add('pxr-custom-form-panel--active');
-                });
+            this.tabs.forEach(tab => tab.addEventListener('click', () => this.showTab(tab.dataset.pxrTab)));
+
+            this.backBtn = this.wrapper.querySelector('[data-pxr-step-back]');
+            this.nextBtn = this.wrapper.querySelector('[data-pxr-step-next]');
+            if (this.backBtn) this.backBtn.addEventListener('click', () => this.stepTab(-1));
+            if (this.nextBtn) this.nextBtn.addEventListener('click', () => this.stepTab(1));
+
+            this.showTab(this.tabs[0].dataset.pxrTab);
+        }
+
+        currentTab() {
+            return this.tabs.findIndex(tab => tab.classList.contains('pxr-custom-form-tab--active'));
+        }
+
+        showTab(name) {
+            this.tabs.forEach(tab => {
+                const active = tab.dataset.pxrTab === name;
+                tab.classList.toggle('pxr-custom-form-tab--active', active);
+                tab.setAttribute('aria-selected', active ? 'true' : 'false');
             });
+            this.wrapper.querySelectorAll('[data-pxr-panel]').forEach(panel => {
+                panel.classList.toggle('pxr-custom-form-panel--active', panel.dataset.pxrPanel === name);
+            });
+
+            const index = this.currentTab();
+            if (this.backBtn) this.backBtn.hidden = index <= 0;
+            if (this.nextBtn) this.nextBtn.hidden = index >= this.tabs.length - 1;
+        }
+
+        stepTab(direction) {
+            const target = this.tabs[this.currentTab() + direction];
+            if (!target) return;
+            this.showTab(target.dataset.pxrTab);
+            this.wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            target.focus({ preventScroll: true });
         }
 
         /* ── Multiselect Dropdown ── */
@@ -92,14 +286,20 @@
                 if (!trigger || !dropdown) return;
 
                 const updateTags = () => {
-                    tagsWrap.innerHTML = '';
+                    tagsWrap.textContent = '';
                     let count = 0;
                     checkboxes.forEach(cb => {
                         if (cb.checked) {
                             count++;
                             const tag = document.createElement('span');
                             tag.className = 'pxr-custom-multiselect__tag';
-                            tag.innerHTML = `${cb.dataset.label}<button type="button" class="pxr-custom-multiselect__tag-remove" data-value="${cb.value}">&times;</button>`;
+                            tag.textContent = cb.dataset.label;
+                            const remove = document.createElement('button');
+                            remove.type = 'button';
+                            remove.className = 'pxr-custom-multiselect__tag-remove';
+                            remove.dataset.value = cb.value;
+                            remove.textContent = '\u00d7';
+                            tag.appendChild(remove);
                             tagsWrap.appendChild(tag);
                         }
                     });
@@ -141,79 +341,174 @@
             });
         }
 
-        /* ── Ingredients ── */
+        /* ── Ingredient and step lists ── */
 
-        initIngredients() {
-            this.ingredientContainer = this.wrapper.querySelector('[data-pxr-ingredient-rows]');
-            const addBtn = this.wrapper.querySelector('[data-pxr-add-ingredient]');
-            if (!this.ingredientContainer || !addBtn) return;
+        initLists() {
+            const ingredientRows  = this.wrapper.querySelector('[data-pxr-ingredient-rows]');
+            const instructionRows = this.wrapper.querySelector('[data-pxr-instruction-rows]');
 
-            addBtn.addEventListener('click', () => {
-                const template = this.ingredientContainer.querySelector('[data-pxr-ingredient-row]');
-                const row = template.cloneNode(true);
-                row.querySelectorAll('input, select').forEach(el => { el.value = ''; });
-                row.querySelector('[data-pxr-remove-ingredient]').disabled = false;
-                this.ingredientContainer.appendChild(row);
-                row.querySelector('input[name="ing_name[]"]').focus();
-                this.updateRemoveButtons();
-            });
+            if (ingredientRows) {
+                this.ingredients = new RowList(ingredientRows, {
+                    itemTemplate: '[data-pxr-ingredient-template]',
+                    onChange: () => this.scheduleDraft(),
+                });
 
-            this.ingredientContainer.addEventListener('click', (e) => {
-                const btn = e.target.closest('[data-pxr-remove-ingredient]');
-                if (btn && this.ingredientContainer.querySelectorAll('[data-pxr-ingredient-row]').length > 1) {
-                    btn.closest('[data-pxr-ingredient-row]').remove();
-                    this.updateRemoveButtons();
-                }
-            });
-        }
+                const add = this.wrapper.querySelector('[data-pxr-add-ingredient]');
+                if (add) add.addEventListener('click', () => this.focusRow(this.ingredients.add('item')));
 
-        /* ── Instructions ── */
+                // Enter moves down the list instead of submitting a half-written recipe; on the
+                // last row, once it holds something, it adds the next one.
+                ingredientRows.addEventListener('keydown', (e) => {
+                    if (e.key !== 'Enter' || !e.target.matches('input')) return;
+                    e.preventDefault();
 
-        initInstructions() {
-            this.instructionContainer = this.wrapper.querySelector('[data-pxr-instruction-rows]');
-            const addBtn = this.wrapper.querySelector('[data-pxr-add-instruction]');
-            if (!this.instructionContainer || !addBtn) return;
+                    const row  = e.target.closest('[data-pxr-row]');
+                    const rows = this.ingredients.rows();
+                    const next = rows[rows.indexOf(row) + 1];
+                    const empty = Array.from(row.querySelectorAll('input')).every(el => el.value.trim() === '');
 
-            addBtn.addEventListener('click', () => {
-                const template = this.instructionContainer.querySelector('[data-pxr-instruction-row]');
-                const row = template.cloneNode(true);
-                row.querySelectorAll('input, textarea').forEach(el => { el.value = ''; });
-                row.querySelector('[data-pxr-remove-instruction]').disabled = false;
-                this.instructionContainer.appendChild(row);
-                this.renumberSteps();
-                row.querySelector('textarea').focus();
-                this.updateRemoveButtons();
-            });
+                    if (next) {
+                        this.focusRow(next);
+                    } else if (!empty) {
+                        this.focusRow(this.ingredients.add('item'));
+                    }
+                });
 
-            this.instructionContainer.addEventListener('click', (e) => {
-                const btn = e.target.closest('[data-pxr-remove-instruction]');
-                if (btn && this.instructionContainer.querySelectorAll('[data-pxr-instruction-row]').length > 1) {
-                    btn.closest('[data-pxr-instruction-row]').remove();
-                    this.renumberSteps();
-                    this.updateRemoveButtons();
-                }
-            });
-        }
-
-        renumberSteps() {
-            this.instructionContainer.querySelectorAll('[data-pxr-step-number]').forEach((el, i) => {
-                el.textContent = i + 1;
-            });
-        }
-
-        updateRemoveButtons() {
-            if (this.ingredientContainer) {
-                const rows = this.ingredientContainer.querySelectorAll('[data-pxr-ingredient-row]');
-                rows.forEach(row => {
-                    row.querySelector('[data-pxr-remove-ingredient]').disabled = rows.length <= 1;
+                // Several lines pasted into one row are a list: read them as one.
+                ingredientRows.addEventListener('paste', (e) => {
+                    const text = (e.clipboardData || window.clipboardData).getData('text');
+                    if (!/[\r\n]/.test(text.trim())) return;
+                    e.preventDefault();
+                    this.applyPaste('ingredients', text);
                 });
             }
-            if (this.instructionContainer) {
-                const rows = this.instructionContainer.querySelectorAll('[data-pxr-instruction-row]');
-                rows.forEach(row => {
-                    row.querySelector('[data-pxr-remove-instruction]').disabled = rows.length <= 1;
+
+            if (instructionRows) {
+                this.instructions = new RowList(instructionRows, {
+                    itemTemplate: '[data-pxr-instruction-template]',
+                    onChange: () => this.scheduleDraft(),
+                    onEmptied: (row) => this.setStepPhoto(row, null),
+                });
+
+                const add = this.wrapper.querySelector('[data-pxr-add-instruction]');
+                if (add) add.addEventListener('click', () => this.focusRow(this.instructions.add('item'), 'textarea'));
+
+                // A step's photo: chosen, checked for size, remembered on its row.
+                instructionRows.addEventListener('change', (e) => {
+                    if (!e.target.matches('[data-pxr-step-photo]')) return;
+                    const row  = e.target.closest('[data-pxr-row]');
+                    const file = e.target.files && e.target.files[0];
+                    e.target.value = '';
+                    if (!file) return;
+
+                    if (file.size > this.maxFileSize) {
+                        this.showMessage('error', t('fileTooLarge', 'That file is too large. The maximum size is %dMB.', Math.round(this.maxFileSize / 1024 / 1024)));
+                        return;
+                    }
+                    const taken = this.instructions.items().filter(item => item.pxrPhoto && item !== row).length;
+                    if (taken >= MAX_STEP_PHOTOS) {
+                        this.showMessage('error', t('stepPhotosFull', 'At most %d steps can have a photo.', MAX_STEP_PHOTOS));
+                        return;
+                    }
+                    this.setStepPhoto(row, file);
+                });
+                instructionRows.addEventListener('click', (e) => {
+                    const remove = e.target.closest('[data-pxr-step-photo-remove]');
+                    if (remove) this.setStepPhoto(remove.closest('[data-pxr-row]'), null);
                 });
             }
+
+            this.wrapper.querySelectorAll('[data-pxr-add-heading]').forEach(button => {
+                button.addEventListener('click', () => {
+                    const list = button.dataset.pxrAddHeading === 'instructions' ? this.instructions : this.ingredients;
+                    if (list) this.focusRow(list.add('group'));
+                });
+            });
+        }
+
+        focusRow(row, selector = 'input:not([type="file"])') {
+            const field = row && row.querySelector(selector);
+            if (field) field.focus();
+        }
+
+        setStepPhoto(row, file) {
+            if (!row) return;
+            row.pxrPhoto = file || null;
+            const label  = row.querySelector('[data-pxr-step-photo-label]');
+            const remove = row.querySelector('[data-pxr-step-photo-remove]');
+            if (label) label.textContent = file ? file.name : t('addPhoto', 'Add a photo');
+            if (remove) remove.hidden = !file;
+        }
+
+        /* ── Paste a list ── */
+
+        initPaste() {
+            this.wrapper.querySelectorAll('[data-pxr-paste-toggle]').forEach(toggle => {
+                const kind  = toggle.dataset.pxrPasteToggle;
+                const panel = this.wrapper.querySelector(`[data-pxr-paste-panel="${kind}"]`);
+                if (!panel) return;
+
+                const area  = panel.querySelector('[data-pxr-paste-text]');
+                const close = () => {
+                    panel.hidden = true;
+                    toggle.setAttribute('aria-expanded', 'false');
+                };
+
+                toggle.addEventListener('click', () => {
+                    panel.hidden = !panel.hidden;
+                    toggle.setAttribute('aria-expanded', panel.hidden ? 'false' : 'true');
+                    if (!panel.hidden) area.focus();
+                });
+                panel.querySelector('[data-pxr-paste-cancel]').addEventListener('click', () => {
+                    close();
+                    toggle.focus();
+                });
+                panel.querySelector('[data-pxr-paste-apply]').addEventListener('click', () => {
+                    if (this.applyPaste(kind, area.value)) {
+                        area.value = '';
+                        close();
+                    }
+                });
+            });
+        }
+
+        /**
+         * Turn pasted text into rows of the list. The list itself is the review: every row is
+         * editable and nothing is sent until the form is submitted. A row the parser was
+         * unsure of is marked, so the eye goes to it.
+         */
+        applyPaste(kind, text) {
+            const list = kind === 'instructions' ? this.instructions : this.ingredients;
+            if (!list || !PARSER) return false;
+
+            const parsed = kind === 'instructions' ? PARSER.parseStepBlock(text) : PARSER.parseIngredientBlock(text, UNITS);
+            if (!parsed.length) {
+                this.showMessage('error', t('pastedNothing', 'Nothing in that text looked like a list.'));
+                return false;
+            }
+
+            if (list.untouched()) list.container.textContent = '';
+
+            let first = null;
+            parsed.forEach(entry => {
+                let row;
+                if (entry.kind === 'group') {
+                    row = list.add('group', { 'group_heading[]': entry.name });
+                } else if (kind === 'instructions') {
+                    row = list.add('item', { 'instructions[]': entry.text });
+                } else {
+                    row = list.add('item', { 'ing_qty[]': entry.quantity, 'ing_unit[]': entry.unit, 'ing_name[]': entry.name, 'ing_notes[]': entry.notes });
+                    if (row && entry.sure === false) {
+                        row.classList.add('pxr-custom-row--check');
+                        row.title = t('checkRow', 'Check this row: it did not read like an ingredient.');
+                    }
+                }
+                first = first || row;
+            });
+
+            this.showMessage('success', t('pasted', '%d row(s) added from your text. Check them before submitting.', parsed.length));
+            if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return true;
         }
 
         /* ── Image Upload ── */
@@ -275,7 +570,7 @@
 
             if (file.size > this.maxFileSize) {
                 const sizeMB = Math.round(this.maxFileSize / 1024 / 1024);
-                this.showMessage('error', `File is too large. Maximum size is ${sizeMB}MB.`);
+                this.showMessage('error', t('fileTooLarge', 'That file is too large. The maximum size is %dMB.', sizeMB));
                 this.fileInput.value = '';
                 return;
             }
@@ -341,11 +636,11 @@
             const sizeMB = Math.round(this.maxFileSize / 1024 / 1024);
             for (const file of fileList) {
                 if (this.galleryFiles.length >= this.maxGalleryImages) {
-                    this.showMessage('error', `Maximum ${this.maxGalleryImages} gallery images allowed.`);
+                    this.showMessage('error', t('galleryFull', 'At most %d gallery images are allowed.', this.maxGalleryImages));
                     break;
                 }
                 if (file.size > this.maxFileSize) {
-                    this.showMessage('error', `"${file.name}" is too large. Maximum size is ${sizeMB}MB.`);
+                    this.showMessage('error', t('fileTooLarge', 'That file is too large. The maximum size is %dMB.', sizeMB));
                     continue;
                 }
                 this.galleryFiles.push(file);
@@ -354,7 +649,7 @@
         }
 
         renderGalleryPreviews() {
-            this.galleryGrid.innerHTML = '';
+            this.galleryGrid.textContent = '';
             this.galleryFiles.forEach((file, i) => {
                 const item = document.createElement('div');
                 item.className = 'pxr-custom-gallery-item';
@@ -368,7 +663,7 @@
                 removeBtn.type = 'button';
                 removeBtn.className = 'pxr-custom-gallery-item__remove';
                 removeBtn.dataset.index = i;
-                removeBtn.innerHTML = '&times;';
+                removeBtn.textContent = '\u00d7';
                 item.appendChild(img);
                 item.appendChild(removeBtn);
                 this.galleryGrid.appendChild(item);
@@ -376,6 +671,102 @@
             if (this.galleryPlaceholder) {
                 this.galleryPlaceholder.style.display = this.galleryFiles.length > 0 ? 'none' : '';
             }
+        }
+
+        /* ── Draft kept in the browser ── */
+
+        /**
+         * What has been typed is kept in THIS browser, so a closed tab or a dropped connection
+         * does not cost a visitor their recipe. Text only - never the photos, the captcha or
+         * the honeypot - under a key of this page, for thirty days, and gone on submit, on
+         * Reset and on Discard. It is offered back, never restored unasked: on a shared
+         * computer the last visitor's recipe must not appear in the next one's form.
+         */
+        initDraft() {
+            this.draftKey = 'plugixaRecipe:formDraft:v1:' + window.location.pathname;
+            const notice  = this.wrapper.querySelector('[data-pxr-draft-notice]');
+            const draft   = this.readDraft();
+            if (!notice || !draft) return;
+
+            notice.hidden = false;
+            this.draftOffered = true;
+            notice.querySelector('[data-pxr-draft-restore]').addEventListener('click', () => {
+                this.restoreDraft(draft);
+                notice.hidden = true;
+                this.draftOffered = false;
+            });
+            notice.querySelector('[data-pxr-draft-discard]').addEventListener('click', () => {
+                this.discardDraft();
+                notice.hidden = true;
+                this.draftOffered = false;
+            });
+        }
+
+        readDraft() {
+            try {
+                const draft = JSON.parse(window.localStorage.getItem(this.draftKey) || 'null');
+                const fresh = draft && typeof draft.savedAt === 'number' && Date.now() - draft.savedAt < 30 * 24 * 60 * 60 * 1000;
+                if (draft && !fresh) window.localStorage.removeItem(this.draftKey);
+                return fresh ? draft : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        discardDraft() {
+            clearTimeout(this.draftTimer);
+            try { window.localStorage.removeItem(this.draftKey); } catch (e) { /* no storage, no draft */ }
+        }
+
+        /** Fields the draft holds: everything typed, minus what must never be stored. */
+        draftFields() {
+            return Array.from(this.form.elements).filter(el => el.name
+                && !['file', 'submit', 'reset', 'button', 'hidden'].includes(el.type)
+                && !['website_url', 'turnstile_token', 'cf-turnstile-response'].includes(el.name)
+                && !el.closest('[data-pxr-row]'));
+        }
+
+        scheduleDraft() {
+            // A draft still on offer is not overwritten before it has been answered.
+            if (this.quiet || this.draftOffered || !this.draftKey) return;
+            clearTimeout(this.draftTimer);
+            this.draftTimer = setTimeout(() => {
+                const fields = {};
+                this.draftFields().forEach(el => {
+                    if (el.type === 'checkbox' || el.type === 'radio') {
+                        if (el.checked) (fields[el.name] = fields[el.name] || []).push(el.value);
+                    } else if (el.value !== '') {
+                        fields[el.name] = el.value;
+                    }
+                });
+                try {
+                    window.localStorage.setItem(this.draftKey, JSON.stringify({
+                        savedAt: Date.now(),
+                        fields,
+                        ingredients: this.ingredients ? this.ingredients.snapshot() : [],
+                        instructions: this.instructions ? this.instructions.snapshot() : [],
+                    }));
+                } catch (e) { /* private mode or a full quota: the form works without a draft */ }
+            }, 1200);
+        }
+
+        restoreDraft(draft) {
+            this.quiet = true;
+            this.draftFields().forEach(el => {
+                const stored = draft.fields ? draft.fields[el.name] : undefined;
+                if (el.type === 'checkbox' || el.type === 'radio') {
+                    el.checked = Array.isArray(stored) && stored.includes(el.value);
+                } else if (typeof stored === 'string') {
+                    el.value = stored;
+                }
+            });
+            if (this.ingredients) this.ingredients.restore(draft.ingredients);
+            if (this.instructions) this.instructions.restore(draft.instructions);
+            // The category picker shows its choices as tags; redraw them from the checkboxes.
+            this.wrapper.querySelectorAll('[data-pxr-multiselect-dropdown]').forEach(dropdown => {
+                dropdown.dispatchEvent(new Event('change', { bubbles: false }));
+            });
+            this.quiet = false;
         }
 
         /* ── Messages ── */
@@ -396,7 +787,7 @@
 
         setLoading(loading) {
             this.submitBtn.disabled = loading;
-            this.btnText.textContent = loading ? 'Submitting...' : 'Submit Recipe';
+            this.btnText.textContent = loading ? t('submitting', 'Submitting...') : t('submit', 'Submit Recipe');
             this.btnSpinner.classList.toggle('pxr:hidden', !loading);
         }
 
@@ -408,90 +799,76 @@
                 const el = this.form.querySelector(`[name="${name}"]`);
                 return el ? el.value.trim() : '';
             };
+            const minutes = (name, required, requiredMessage) => {
+                const value = val(name);
+                if (value === '') {
+                    if (required) errors.push({ field: name, tab: 'details', message: requiredMessage });
+                } else if (parseInt(value, 10) < 0 || parseInt(value, 10) > 9999 || isNaN(parseInt(value, 10))) {
+                    errors.push({ field: name, tab: 'details', message: t('timeRange', 'Enter a time between 0 and 9999 minutes.') });
+                }
+            };
 
             // Basic tab.
             if (!val('title')) {
-                errors.push({ field: 'title', tab: 'basic', message: 'Recipe title is required.' });
+                errors.push({ field: 'title', tab: 'basic', message: t('titleRequired', 'Recipe title is required.') });
             }
             if (!val('description')) {
-                errors.push({ field: 'description', tab: 'basic', message: 'Description is required.' });
+                errors.push({ field: 'description', tab: 'basic', message: t('descRequired', 'Description is required.') });
             }
             // Image (basic tab).
             const fileInput = this.wrapper.querySelector('[data-pxr-file-input]');
             const previewEl = this.wrapper.querySelector('[data-pxr-upload-preview]');
             const previewVisible = previewEl && !previewEl.classList.contains('pxr:hidden');
             if ((!fileInput || !fileInput.files || !fileInput.files.length) && !previewVisible) {
-                errors.push({ field: 'recipe_image', tab: 'basic', message: 'Recipe image is required.' });
-            }
-
-            // Details tab — categories.
-            const checkedCategories = this.form.querySelectorAll('input[name="categories[]"]:checked');
-            if (checkedCategories.length === 0) {
-                errors.push({ field: 'categories[]', tab: 'details', message: 'Please select at least one category.' });
+                errors.push({ field: 'recipe_image', tab: 'basic', message: t('imageRequired', 'Recipe image is required.') });
             }
 
             // Details tab.
+            if (this.form.querySelector('input[name="categories[]"]') && this.form.querySelectorAll('input[name="categories[]"]:checked').length === 0) {
+                errors.push({ field: 'categories[]', tab: 'details', message: t('categoryRequired', 'Please select at least one category.') });
+            }
             if (!val('difficulty')) {
-                errors.push({ field: 'difficulty', tab: 'details', message: 'Difficulty is required.' });
+                errors.push({ field: 'difficulty', tab: 'details', message: t('difficultyRequired', 'Difficulty is required.') });
             }
             const servings = val('servings');
             if (!servings || parseInt(servings, 10) < 1 || parseInt(servings, 10) > 999) {
-                errors.push({ field: 'servings', tab: 'details', message: 'Servings must be between 1 and 999.' });
+                errors.push({ field: 'servings', tab: 'details', message: t('servingsRange', 'Servings must be between 1 and 999.') });
             }
-            const prepTime = val('prep_time');
-            if (prepTime === '') {
-                errors.push({ field: 'prep_time', tab: 'details', message: 'Prep time is required.' });
-            } else if (parseInt(prepTime, 10) < 0 || parseInt(prepTime, 10) > 9999) {
-                errors.push({ field: 'prep_time', tab: 'details', message: 'Prep time must be 0–9999 minutes.' });
-            }
-            const cookTime = val('cook_time');
-            if (cookTime === '') {
-                errors.push({ field: 'cook_time', tab: 'details', message: 'Cook time is required.' });
-            } else if (parseInt(cookTime, 10) < 0 || parseInt(cookTime, 10) > 9999) {
-                errors.push({ field: 'cook_time', tab: 'details', message: 'Cook time must be 0–9999 minutes.' });
-            }
-            const restTime = val('rest_time');
-            if (restTime !== '' && (parseInt(restTime, 10) < 0 || parseInt(restTime, 10) > 9999)) {
-                errors.push({ field: 'rest_time', tab: 'details', message: 'Rest time must be 0–9999 minutes.' });
-            }
+            minutes('prep_time', true, t('prepRequired', 'Prep time is required.'));
+            minutes('cook_time', true, t('cookRequired', 'Cook time is required.'));
+            minutes('rest_time', false, '');
 
             // Ingredients tab.
-            let hasIngredient = false;
-            this.wrapper.querySelectorAll('[data-pxr-ingredient-row]').forEach(row => {
-                if (row.querySelector('input[name="ing_name[]"]')?.value.trim()) hasIngredient = true;
-            });
-            if (!hasIngredient) {
-                errors.push({ field: 'ing_name[]', tab: 'ingredients', message: 'At least one ingredient is required.' });
+            if (this.ingredients && !this.ingredients.items().some(row => row.querySelector('[name="ing_name[]"]').value.trim())) {
+                errors.push({ element: this.ingredients.items()[0].querySelector('[name="ing_name[]"]'), tab: 'ingredients', message: t('ingredientRequired', 'At least one ingredient is required.') });
             }
 
             // Instructions tab.
-            let hasInstruction = false;
-            this.wrapper.querySelectorAll('[data-pxr-instruction-row]').forEach(row => {
-                if (row.querySelector('textarea[name="instructions[]"]')?.value.trim()) hasInstruction = true;
-            });
-            if (!hasInstruction) {
-                errors.push({ field: 'instructions[]', tab: 'instructions', message: 'At least one instruction step is required.' });
+            if (this.instructions) {
+                const steps = this.instructions.items();
+                if (!steps.some(row => row.querySelector('[name="instructions[]"]').value.trim())) {
+                    errors.push({ element: steps[0].querySelector('[name="instructions[]"]'), tab: 'instructions', message: t('stepRequired', 'At least one instruction step is required.') });
+                }
+                steps.forEach(row => {
+                    const timer = row.querySelector('[name="inst_timers[]"]');
+                    if (timer && timer.value.trim() !== '' && PARSER && PARSER.parseTimer(timer.value) === null) {
+                        errors.push({ element: timer, tab: 'instructions', message: t('timerInvalid', 'Use minutes, or a time such as 1:30, 90s or 1h 20m.') });
+                    }
+                });
             }
 
             // Extras tab — optional URL validation.
             const urlPattern = /^https?:\/\/.+/i;
-            const videoUrl = val('video_url');
-            if (videoUrl && !urlPattern.test(videoUrl)) {
-                errors.push({ field: 'video_url', tab: 'extras', message: 'Please enter a valid URL (starting with http:// or https://).' });
-            }
-            const sourceUrl = val('source_url');
-            if (sourceUrl && !urlPattern.test(sourceUrl)) {
-                errors.push({ field: 'source_url', tab: 'extras', message: 'Please enter a valid URL (starting with http:// or https://).' });
-            }
+            ['video_url', 'source_url'].forEach(name => {
+                if (val(name) && !urlPattern.test(val(name))) {
+                    errors.push({ field: name, tab: 'extras', message: t('urlInvalid', 'Please enter a valid URL (starting with http:// or https://).') });
+                }
+            });
 
             // Nutrition tab — non-negative values.
-            const nutritionFields = ['calories','total_fat','saturated_fat','trans_fat','cholesterol',
-                'sodium','total_carbohydrate','dietary_fiber','total_sugars',
-                'protein','vitamin_a','vitamin_c','calcium','iron','potassium'];
-            nutritionFields.forEach(field => {
-                const input = this.form.querySelector(`[name="nutrition_${field}"]`);
-                if (input && input.value !== '' && parseFloat(input.value) < 0) {
-                    errors.push({ field: `nutrition_${field}`, tab: 'nutrition', message: `${field.replace(/_/g, ' ')} cannot be negative.` });
+            this.form.querySelectorAll('[name^="nutrition_"]').forEach(input => {
+                if (input.type === 'number' && input.value !== '' && parseFloat(input.value) < 0) {
+                    errors.push({ element: input, tab: 'nutrition', message: t('notNegative', 'This value cannot be negative.') });
                 }
             });
 
@@ -502,18 +879,13 @@
                     const name = input.name;
                     if (checkedRadioGroups.has(name)) return;
                     checkedRadioGroups.add(name);
-                    if (input.required) {
-                        const anyChecked = this.form.querySelector(`input[name="${name}"]:checked`);
-                        if (!anyChecked) {
-                            const label = input.closest('div')?.parentElement?.querySelector('label')?.textContent?.trim() || name;
-                            errors.push({ field: name, tab: 'custom-fields', message: `${label} is required.` });
-                        }
+                    if (input.required && !this.form.querySelector(`input[name="${name}"]:checked`)) {
+                        errors.push({ element: input, tab: 'custom-fields', message: t('fieldRequired', 'This field is required.') });
                     }
                 } else if (input.type === 'checkbox') {
                     // Checkbox groups are optional by default (no required attr on multi-check)
                 } else if (input.required && !input.value.trim()) {
-                    const label = input.closest('div')?.querySelector('label')?.textContent?.trim() || input.name;
-                    errors.push({ field: input.name, tab: 'custom-fields', message: `${label} is required.` });
+                    errors.push({ element: input, tab: 'custom-fields', message: t('fieldRequired', 'This field is required.') });
                 }
             });
 
@@ -524,20 +896,30 @@
             this.clearFieldErrors();
 
             const tabsWithErrors = new Set();
+            let serial = 0;
+            // Mark one element and say why beneath it, tied together for a screen reader.
+            const mark = (el, holder, message) => {
+                const msg = document.createElement('div');
+                msg.className = 'pxr-custom-field-error';
+                msg.id = `${this.wrapper.id}-error-${++serial}`;
+                msg.textContent = message;
+                holder.appendChild(msg);
+                el.classList.add('pxr-custom-form-input--error');
+                el.setAttribute('aria-invalid', 'true');
+                el.setAttribute('aria-describedby', msg.id);
+            };
 
             errors.forEach(err => {
+                tabsWithErrors.add(err.tab);
+
                 // Special handling: categories multiselect trigger.
                 if (err.field === 'categories[]') {
                     const ms = this.wrapper.querySelector('[data-pxr-multiselect]');
-                    if (ms) {
-                        const trigger = ms.querySelector('[data-pxr-multiselect-trigger]');
-                        if (trigger) trigger.classList.add('pxr-custom-form-input--error');
-                        const msg = document.createElement('div');
-                        msg.className = 'pxr-custom-field-error';
-                        msg.textContent = err.message;
-                        ms.appendChild(msg);
+                    const trigger = ms && ms.querySelector('[data-pxr-multiselect-trigger]');
+                    if (trigger) {
+                        mark(trigger, ms, err.message);
+                        err.element = trigger;
                     }
-                    tabsWithErrors.add(err.tab);
                     return;
                 }
 
@@ -545,27 +927,17 @@
                 if (err.field === 'recipe_image') {
                     const zone = this.wrapper.querySelector('[data-pxr-upload-zone]');
                     if (zone) {
-                        zone.classList.add('pxr-custom-form-input--error');
-                        const msg = document.createElement('div');
-                        msg.className = 'pxr-custom-field-error';
-                        msg.textContent = err.message;
-                        zone.parentElement.appendChild(msg);
+                        mark(zone, zone.parentElement, err.message);
+                        err.element = zone;
                     }
-                    tabsWithErrors.add(err.tab);
                     return;
                 }
 
-                // Default handling.
-                const el = this.form.querySelector(`[name="${err.field}"]`);
+                const el = err.element || this.form.querySelector(`[name="${err.field}"]`);
                 if (el) {
-                    el.classList.add('pxr-custom-form-input--error');
-                    // Insert inline error message after the input.
-                    const msg = document.createElement('div');
-                    msg.className = 'pxr-custom-field-error';
-                    msg.textContent = err.message;
-                    el.parentElement.appendChild(msg);
+                    mark(el, el.parentElement, err.message);
+                    err.element = el;
                 }
-                tabsWithErrors.add(err.tab);
             });
 
             // Mark tabs that have errors.
@@ -574,36 +946,28 @@
                 if (tabBtn) tabBtn.classList.add('pxr-custom-form-tab--has-error');
             });
 
-            // Navigate to the first error's tab.
+            // Go to the first problem: its tab, then the field itself.
             if (errors.length > 0) {
-                const firstTab = this.wrapper.querySelector(`[data-pxr-tab="${errors[0].tab}"]`);
-                if (firstTab) firstTab.click();
+                this.showMessage('error', t('fixErrors', 'Please fix %d problem(s) before submitting.', errors.length));
+                this.showTab(errors[0].tab);
 
-                const firstField = this.form.querySelector(`[name="${errors[0].field}"]`);
-                if (firstField) {
-                    firstField.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    firstField.focus();
+                const first = errors[0].element;
+                if (first) {
+                    first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    first.focus({ preventScroll: true });
                 }
-
-                const count = errors.length;
-                this.showMessage('error', `Please fix ${count} error${count > 1 ? 's' : ''} before submitting.`);
             }
         }
 
         clearFieldErrors() {
             this.wrapper.querySelectorAll('.pxr-custom-form-input--error').forEach(el => {
                 el.classList.remove('pxr-custom-form-input--error');
+                el.removeAttribute('aria-invalid');
+                el.removeAttribute('aria-describedby');
             });
             this.wrapper.querySelectorAll('.pxr-custom-field-error').forEach(el => el.remove());
             this.wrapper.querySelectorAll('.pxr-custom-form-tab--has-error').forEach(el => {
                 el.classList.remove('pxr-custom-form-tab--has-error');
-            });
-            // Clear special elements (upload zone, multiselect trigger).
-            this.wrapper.querySelectorAll('[data-pxr-upload-zone].pxr-custom-form-input--error').forEach(el => {
-                el.classList.remove('pxr-custom-form-input--error');
-            });
-            this.wrapper.querySelectorAll('[data-pxr-multiselect-trigger].pxr-custom-form-input--error').forEach(el => {
-                el.classList.remove('pxr-custom-form-input--error');
             });
         }
 
@@ -622,30 +986,31 @@
             }
 
             const formData = new FormData(this.form);
+            const value = (row, name) => (row.querySelector(`[name="${name}"]`)?.value || '').trim();
 
-            // Collect structured ingredients as JSON (qty + unit + name + notes).
-            const ingredients = [];
-            this.wrapper.querySelectorAll('[data-pxr-ingredient-row]').forEach(row => {
-                const name = row.querySelector('input[name="ing_name[]"]')?.value.trim();
-                if (!name) return;
-                ingredients.push({
-                    quantity: row.querySelector('input[name="ing_qty[]"]')?.value.trim() || '',
-                    unit:     row.querySelector('select[name="ing_unit[]"]')?.value || '',
-                    name,
-                    notes:    row.querySelector('input[name="ing_notes[]"]')?.value.trim() || '',
-                });
-            });
+            // The ingredients, each with the group heading it sits under.
+            const ingredients = this.ingredients ? this.ingredients.collect(row => {
+                const name = value(row, 'ing_name[]');
+                return name ? { quantity: value(row, 'ing_qty[]'), unit: value(row, 'ing_unit[]'), name, notes: value(row, 'ing_notes[]') } : null;
+            }) : [];
 
-            // Collect instructions as JSON (title + text).
-            const instructions = [];
-            this.wrapper.querySelectorAll('[data-pxr-instruction-row]').forEach(row => {
-                const text = row.querySelector('textarea[name="instructions[]"]')?.value.trim();
-                if (!text) return;
-                instructions.push({
-                    title:            row.querySelector('input[name="inst_titles[]"]')?.value.trim() || '',
+            // The steps. A photo travels as step_images[n]; the step says which n is its own.
+            const photos = [];
+            const instructions = this.instructions ? this.instructions.collect(row => {
+                const text = value(row, 'instructions[]');
+                if (!text) return null;
+
+                const step = {
+                    title: value(row, 'inst_titles[]'),
                     instruction_text: text,
-                });
-            });
+                    timer_seconds: (PARSER && PARSER.parseTimer(value(row, 'inst_timers[]'))) || 0,
+                };
+                if (row.pxrPhoto && photos.length < MAX_STEP_PHOTOS) {
+                    step.image_index = photos.length;
+                    photos.push(row.pxrPhoto);
+                }
+                return step;
+            }) : [];
 
             // Collect nutrition as JSON object.
             const nutrition = {};
@@ -688,13 +1053,8 @@
             });
 
             // Remove raw row inputs, nutrition inputs, and custom field inputs, then append JSON.
-            formData.delete('ing_qty[]');
-            formData.delete('ing_unit[]');
-            formData.delete('ing_name[]');
-            formData.delete('ing_notes[]');
-            formData.delete('instructions[]');
-            formData.delete('inst_titles[]');
-            formData.delete('nutrition_serving_size');
+            ['ing_qty[]', 'ing_unit[]', 'ing_name[]', 'ing_notes[]', 'instructions[]', 'inst_titles[]', 'inst_timers[]', 'group_heading[]', 'nutrition_serving_size']
+                .forEach(name => formData.delete(name));
             nutritionFields.forEach(f => formData.delete(nutritionPrefix + f));
             this.form.querySelectorAll('[name^="custom_field_"]').forEach(input => {
                 formData.delete(input.name);
@@ -702,6 +1062,7 @@
 
             formData.append('ingredients', JSON.stringify(ingredients));
             formData.append('instructions', JSON.stringify(instructions));
+            photos.forEach((file, index) => formData.append(`step_images[${index}]`, file));
             if (hasNutrition) {
                 formData.append('nutrition', JSON.stringify(nutrition));
             }
@@ -738,13 +1099,10 @@
             .then(result => {
                 this.setLoading(false);
                 if (result.ok && result.data.success !== false) {
-                    const msg = result.data.message || 'Your recipe has been submitted successfully!';
-                    this.showMessage('success', msg);
+                    const msg = result.data.message || t('submitted', 'Your recipe has been submitted successfully!');
                     this.resetForm();
-
-                    // Switch to first tab
-                    const firstTab = this.wrapper.querySelector('[data-pxr-tab]');
-                    if (firstTab) firstTab.click();
+                    this.discardDraft();
+                    this.showMessage('success', msg);
 
                     // Auto-close modal after success.
                     const modal = this.wrapper.closest('.pxr-custom-submission-modal');
@@ -757,19 +1115,21 @@
                 } else {
                     const msg = (result.data && result.data.message)
                         ? result.data.message
-                        : 'An error occurred. Please try again.';
+                        : t('failed', 'An error occurred. Please try again.');
                     this.showMessage('error', msg);
                 }
             })
             .catch(() => {
                 this.setLoading(false);
-                this.showMessage('error', 'Network error. Please check your connection and try again.');
+                this.showMessage('error', t('network', 'Network error. Please check your connection and try again.'));
             });
         }
 
         resetForm() {
+            this.quiet = true;
             this.form.reset();
             this.clearFieldErrors();
+            this.hideMessage();
 
             // Reset image preview.
             if (this.previewWrap) {
@@ -779,30 +1139,23 @@
                 if (zone) zone.classList.remove('has-preview');
             }
 
-            // Reset dynamic rows to single row.
-            if (this.ingredientContainer) {
-                while (this.ingredientContainer.querySelectorAll('[data-pxr-ingredient-row]').length > 1) {
-                    this.ingredientContainer.lastElementChild.remove();
-                }
-            }
-            if (this.instructionContainer) {
-                while (this.instructionContainer.querySelectorAll('[data-pxr-instruction-row]').length > 1) {
-                    this.instructionContainer.lastElementChild.remove();
-                }
-                this.renumberSteps();
-            }
-            this.updateRemoveButtons();
+            // Both lists back to one empty row.
+            if (this.ingredients) this.ingredients.reset();
+            if (this.instructions) this.instructions.reset();
 
             // Reset multiselect tags.
-            this.wrapper.querySelectorAll('[data-pxr-multiselect-tags]').forEach(t => { t.innerHTML = ''; });
+            this.wrapper.querySelectorAll('[data-pxr-multiselect-tags]').forEach(el => { el.textContent = ''; });
             this.wrapper.querySelectorAll('[data-pxr-multiselect-placeholder]').forEach(p => { p.style.display = ''; });
 
             // Reset gallery.
             if (this.galleryFiles) {
                 this.galleryFiles = [];
-                if (this.galleryGrid) this.galleryGrid.innerHTML = '';
+                if (this.galleryGrid) this.galleryGrid.textContent = '';
                 if (this.galleryPlaceholder) this.galleryPlaceholder.style.display = '';
             }
+
+            if (this.tabs && this.tabs.length) this.showTab(this.tabs[0].dataset.pxrTab);
+            this.quiet = false;
         }
     }
 

@@ -17,9 +17,16 @@ defined( 'ABSPATH' ) || exit;
  * set the page put on screen - not "the 20 most recent published recipes", which is what it
  * used to guess and which was wrong on every filtered listing and on the submission form.
  *
- * This registry is the seam. It lives in the free core because the render paths that fill
- * it are free; the premium JSON-LD builder is the only consumer, and it simply reads an
- * empty list when the overlay is absent.
+ * This registry is the seam between the render paths, which fill it, and the JSON-LD
+ * builder (Modules\Schema), its only reader.
+ *
+ * A recipe is on a page in one of two ways, and the markup differs:
+ * - as the page's SUBJECT - the recipe's own page, or a recipe embedded in a post. It is
+ *   described in full (a schema.org Recipe);
+ * - as an entry in a LIST - a listing shortcode, an archive. The page is a summary, so it
+ *   gets one ItemList of links to the recipes' own pages, where the full description is.
+ *   Twenty full Recipe payloads on a listing told a search engine the page was twenty
+ *   recipes at once.
  *
  * What registers: page content that displays a recipe - the [plugixa_recipe] listing and
  * the single-recipe page.
@@ -41,22 +48,38 @@ final class RenderedRecipes {
     private static array $ids = [];
 
     /**
+     * Those of the ids above that are the page's subject, in render order.
+     *
+     * @var int[]
+     */
+    private static array $subjects = [];
+
+    /**
      * Record recipes rendered as page content.
      *
      * Safe to call repeatedly: several shortcodes can appear on one page, and a recipe
      * shown twice is still one recipe.
      *
      * @param iterable<int|string|array<string,mixed>> $recipes Recipe IDs, or rows carrying an 'id'.
+     * @param bool                                     $subject True when the page is ABOUT these
+     *                                                          recipes rather than listing them.
      */
-    public static function add( iterable $recipes ): void {
+    public static function add( iterable $recipes, bool $subject = false ): void {
         foreach ( $recipes as $recipe ) {
             if ( is_array( $recipe ) || is_object( $recipe ) ) {
                 $recipe = ( (array) $recipe )['id'] ?? 0;
             }
 
             $id = (int) $recipe;
-            if ( $id > 0 && ! in_array( $id, self::$ids, true ) ) {
+            if ( $id <= 0 ) {
+                continue;
+            }
+            if ( ! in_array( $id, self::$ids, true ) ) {
                 self::$ids[] = $id;
+            }
+            // Shown in a list AND as the subject, it is the subject.
+            if ( $subject && ! in_array( $id, self::$subjects, true ) ) {
+                self::$subjects[] = $id;
             }
         }
     }
@@ -71,6 +94,24 @@ final class RenderedRecipes {
     }
 
     /**
+     * The recipes this page is about, in render order.
+     *
+     * @return int[]
+     */
+    public static function subjects(): array {
+        return self::$subjects;
+    }
+
+    /**
+     * The recipes this page lists without being about them, in render order.
+     *
+     * @return int[]
+     */
+    public static function listed(): array {
+        return array_values( array_diff( self::$ids, self::$subjects ) );
+    }
+
+    /**
      * Did this request render any recipe as page content?
      */
     public static function has(): bool {
@@ -81,6 +122,7 @@ final class RenderedRecipes {
      * Reset the registry. Test-support only; a real request is a fresh process.
      */
     public static function reset(): void {
-        self::$ids = [];
+        self::$ids      = [];
+        self::$subjects = [];
     }
 }

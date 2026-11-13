@@ -239,8 +239,7 @@ class RecipeWidget extends Widget_Base {
 
         // Late-escaped through the plugin's central allowlist (PlugixaRecipe\Core\Security\Kses), which
         // covers the layout vocabulary a plain wp_kses_post() would strip: inline SVG icons,
-        // <button>, the servings adjuster inputs and the schema.org Recipe microdata
-        // attributes. This became possible once the JSON-LD builder stopped emitting a
+        // <button> and the servings adjuster inputs. This became possible once the JSON-LD builder stopped emitting a
         // <script> element into the shortcode output.
         echo wp_kses($shortcodes->render_recipes($shortcode_atts), plugixa_recipe_allowed_html());
     }

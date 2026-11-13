@@ -78,10 +78,7 @@ if ( ! function_exists( 'plugixa_recipe_daily_value_pct' ) ) {
 <div class="pxr-custom-nutrition-label pxr:border-2 pxr:border-black pxr:p-2 pxr:max-w-xs pxr:font-sans"
      style="border-color: var(--pxr-nutrition-border-color, #000); max-width: var(--pxr-nutrition-max-width, 280px);"
      role="region"
-     aria-label="<?php esc_attr_e( 'Nutrition Facts', 'plugixa-recipe' ); ?>"
-     itemprop="nutrition"
-     itemscope
-     itemtype="https://schema.org/NutritionInformation">
+     aria-label="<?php esc_attr_e( 'Nutrition Facts', 'plugixa-recipe' ); ?>">
 
     <!-- Header -->
     <div class="pxr-custom-nutrition-label__header pxr:pb-1 pxr:mb-1" style="border-bottom: 1px solid #000;">
@@ -104,7 +101,7 @@ if ( ! function_exists( 'plugixa_recipe_daily_value_pct' ) ) {
         <div class="pxr-custom-nutrition-label__serving-size pxr:flex pxr:justify-between pxr:text-sm pxr:font-bold pxr:pb-1"
              style="border-bottom: 8px solid #000;">
             <span><?php esc_html_e( 'Serving size', 'plugixa-recipe' ); ?></span>
-            <span itemprop="servingSize"><?php echo esc_html( $serving_size ); ?></span>
+            <span><?php echo esc_html( $serving_size ); ?></span>
         </div>
     <?php else : ?>
         <div style="border-bottom: 8px solid #000;" class="pxr:pb-1"></div>
@@ -116,7 +113,7 @@ if ( ! function_exists( 'plugixa_recipe_daily_value_pct' ) ) {
              style="border-bottom: 4px solid #000;">
             <div>
                 <span class="pxr:block pxr:text-sm pxr:font-bold"><?php esc_html_e( 'Calories', 'plugixa-recipe' ); ?></span>
-                <span class="pxr:block pxr:text-3xl pxr:font-extrabold pxr:leading-none" itemprop="calories">
+                <span class="pxr:block pxr:text-3xl pxr:font-extrabold pxr:leading-none">
                     <?php echo esc_html( $calories ); ?>
                 </span>
             </div>
@@ -139,7 +136,7 @@ if ( ! function_exists( 'plugixa_recipe_daily_value_pct' ) ) {
                  style="border-bottom: 1px solid #000;">
                 <span><strong><?php esc_html_e( 'Total Fat', 'plugixa-recipe' ); ?></strong> <?php echo esc_html( $total_fat ); ?>g</span>
                 <?php if ( $dv_pct !== null ) : ?>
-                    <span class="pxr:font-bold" itemprop="fatContent"><?php echo esc_html( $dv_pct ); ?>%</span>
+                    <span class="pxr:font-bold"><?php echo esc_html( $dv_pct ); ?>%</span>
                 <?php endif; ?>
             </div>
         <?php endif; ?>
@@ -151,7 +148,7 @@ if ( ! function_exists( 'plugixa_recipe_daily_value_pct' ) ) {
                  style="border-bottom: 1px solid #000;">
                 <span><?php esc_html_e( 'Saturated Fat', 'plugixa-recipe' ); ?> <?php echo esc_html( $saturated_fat ); ?>g</span>
                 <?php if ( $dv_pct !== null ) : ?>
-                    <span class="pxr:font-bold" itemprop="saturatedFatContent"><?php echo esc_html( $dv_pct ); ?>%</span>
+                    <span class="pxr:font-bold"><?php echo esc_html( $dv_pct ); ?>%</span>
                 <?php endif; ?>
             </div>
         <?php endif; ?>
@@ -160,7 +157,7 @@ if ( ! function_exists( 'plugixa_recipe_daily_value_pct' ) ) {
             <div class="pxr-custom-nutrition-label__row pxr-custom-nutrition-label__row--indent pxr:flex pxr:justify-between pxr:py-0.5 pxr:text-sm pxr:pl-4"
                  style="border-bottom: 1px solid #000;">
                 <span><em><?php esc_html_e( 'Trans', 'plugixa-recipe' ); ?></em> <?php esc_html_e( 'Fat', 'plugixa-recipe' ); ?> <?php echo esc_html( $trans_fat ); ?>g</span>
-                <span itemprop="transFatContent"></span>
+                <span></span>
             </div>
         <?php endif; ?>
 
@@ -171,7 +168,7 @@ if ( ! function_exists( 'plugixa_recipe_daily_value_pct' ) ) {
                  style="border-bottom: 1px solid #000;">
                 <span><strong><?php esc_html_e( 'Cholesterol', 'plugixa-recipe' ); ?></strong> <?php echo esc_html( $cholesterol ); ?>mg</span>
                 <?php if ( $dv_pct !== null ) : ?>
-                    <span class="pxr:font-bold" itemprop="cholesterolContent"><?php echo esc_html( $dv_pct ); ?>%</span>
+                    <span class="pxr:font-bold"><?php echo esc_html( $dv_pct ); ?>%</span>
                 <?php endif; ?>
             </div>
         <?php endif; ?>
@@ -183,7 +180,7 @@ if ( ! function_exists( 'plugixa_recipe_daily_value_pct' ) ) {
                  style="border-bottom: 1px solid #000;">
                 <span><strong><?php esc_html_e( 'Sodium', 'plugixa-recipe' ); ?></strong> <?php echo esc_html( $sodium ); ?>mg</span>
                 <?php if ( $dv_pct !== null ) : ?>
-                    <span class="pxr:font-bold" itemprop="sodiumContent"><?php echo esc_html( $dv_pct ); ?>%</span>
+                    <span class="pxr:font-bold"><?php echo esc_html( $dv_pct ); ?>%</span>
                 <?php endif; ?>
             </div>
         <?php endif; ?>
@@ -195,7 +192,7 @@ if ( ! function_exists( 'plugixa_recipe_daily_value_pct' ) ) {
                  style="border-bottom: 1px solid #000;">
                 <span><strong><?php esc_html_e( 'Total Carbohydrate', 'plugixa-recipe' ); ?></strong> <?php echo esc_html( $total_carbohydrate ); ?>g</span>
                 <?php if ( $dv_pct !== null ) : ?>
-                    <span class="pxr:font-bold" itemprop="carbohydrateContent"><?php echo esc_html( $dv_pct ); ?>%</span>
+                    <span class="pxr:font-bold"><?php echo esc_html( $dv_pct ); ?>%</span>
                 <?php endif; ?>
             </div>
         <?php endif; ?>
@@ -207,7 +204,7 @@ if ( ! function_exists( 'plugixa_recipe_daily_value_pct' ) ) {
                  style="border-bottom: 1px solid #000;">
                 <span><?php esc_html_e( 'Dietary Fiber', 'plugixa-recipe' ); ?> <?php echo esc_html( $dietary_fiber ); ?>g</span>
                 <?php if ( $dv_pct !== null ) : ?>
-                    <span class="pxr:font-bold" itemprop="fiberContent"><?php echo esc_html( $dv_pct ); ?>%</span>
+                    <span class="pxr:font-bold"><?php echo esc_html( $dv_pct ); ?>%</span>
                 <?php endif; ?>
             </div>
         <?php endif; ?>
@@ -216,7 +213,7 @@ if ( ! function_exists( 'plugixa_recipe_daily_value_pct' ) ) {
             <div class="pxr-custom-nutrition-label__row pxr-custom-nutrition-label__row--indent pxr:flex pxr:justify-between pxr:py-0.5 pxr:text-sm pxr:pl-4"
                  style="border-bottom: 1px solid #000;">
                 <span><?php esc_html_e( 'Total Sugars', 'plugixa-recipe' ); ?> <?php echo esc_html( $total_sugars ); ?>g</span>
-                <span itemprop="sugarContent"></span>
+                <span></span>
             </div>
         <?php endif; ?>
 
@@ -236,7 +233,7 @@ if ( ! function_exists( 'plugixa_recipe_daily_value_pct' ) ) {
             <div class="pxr-custom-nutrition-label__row pxr:flex pxr:justify-between pxr:py-0.5 pxr:text-sm"
                  style="border-bottom: 8px solid #000;">
                 <span><strong><?php esc_html_e( 'Protein', 'plugixa-recipe' ); ?></strong> <?php echo esc_html( $protein ); ?>g</span>
-                <span itemprop="proteinContent"></span>
+                <span></span>
             </div>
         <?php endif; ?>
 
@@ -307,6 +304,16 @@ if ( ! function_exists( 'plugixa_recipe_daily_value_pct' ) ) {
         <?php endif; ?>
 
     </div>
+
+    <?php if ( isset( $nutrition->source ) && 'usda' === $nutrition->source ) : ?>
+        <!--
+            Worked out from the ingredient list with reference data, not measured for this
+            dish: cooking losses, brands and substitutions are not in it.
+        -->
+        <div class="pxr-custom-nutrition-label__estimate-note pxr:text-xs pxr:pt-1 pxr:leading-snug">
+            <?php esc_html_e( 'Calculated from the ingredients with USDA FoodData Central data. An approximation, not a laboratory analysis.', 'plugixa-recipe' ); ?>
+        </div>
+    <?php endif; ?>
 
     <?php if ( isset( $nutrition->source ) && 'ai' === $nutrition->source ) : ?>
         <!--

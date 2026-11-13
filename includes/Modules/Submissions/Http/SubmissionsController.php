@@ -84,6 +84,13 @@ class SubmissionsController extends PublicController {
         $content_type = $request->get_content_type();
         $is_multipart = $content_type && strpos($content_type['value'] ?? '', 'multipart') !== false;
 
+        // A request larger than PHP's post_max_size arrives with NO fields and no files at
+        // all - PHP discards the body - so the visitor was told "Recipe title is required"
+        // about a form they had filled in. Photos are what make a request that large.
+        if ($is_multipart && empty($_POST) && empty($_FILES) && isset($_SERVER['CONTENT_LENGTH']) && absint(wp_unslash($_SERVER['CONTENT_LENGTH'])) > 0) {
+            return $this->error(__('The photos are too large to upload together. Use smaller images and try again.', 'plugixa-recipe'), 413);
+        }
+
         $get_param = function (string $key, $default = '') use ($is_multipart, $request) {
             if ($is_multipart) {
                 // $_POST is slashed by WP core; unslash ONCE here so the multipart branch yields the
@@ -147,10 +154,37 @@ class SubmissionsController extends PublicController {
 
         // Validate recipe image is provided.
         // phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotValidated -- 'error' is PHP-generated upload metadata compared against a constant; the empty() guards precede it.
+        // The limit a visitor is told is the one that applies: the setting, or the
+        // server's own when that is smaller.
+        $max_bytes = min(((int) ($settings['max_upload_size'] ?? 5)) * MB_IN_BYTES, (int) wp_max_upload_size());
+        $too_large = sprintf(
+            /* translators: %s: the largest image a visitor may upload, e.g. "5 MB". */
+            __('The recipe image is too large. The limit is %s.', 'plugixa-recipe'),
+            size_format($max_bytes)
+        );
+        // PHP refused the file for its size before this code ran: it arrives with no size.
+        if (!empty($_FILES['recipe_image']) && in_array($_FILES['recipe_image']['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+            return $this->error($too_large);
+        }
         if (empty($_FILES['recipe_image']) || empty($_FILES['recipe_image']['size']) || $_FILES['recipe_image']['error'] !== UPLOAD_ERR_OK) {
             return $this->error(__('Recipe image is required.', 'plugixa-recipe'));
         }
         // phpcs:enable WordPress.Security.ValidatedSanitizedInput.InputNotValidated
+
+        // The required image is judged HERE, before anything is written. It used to be
+        // checked after the recipe was stored and "skipped" when it failed: a photo over
+        // the limit (any phone photo) left a recipe with no image, and the visitor was
+        // told it had been submitted successfully.
+        // phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- The whole upload entry is handed to Uploader::store(), which sanitizes the name and re-checks the type itself; the members are validated below against the MIME allow-list and max_upload_size.
+        $image_file = $_FILES['recipe_image'];
+        // phpcs:enable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+        if ($image_file['size'] > $max_bytes) {
+            return $this->error($too_large);
+        }
+        $image_mime = wp_check_filetype_and_ext($image_file['tmp_name'], $image_file['name']);
+        if (empty($image_mime['type']) || !in_array($image_mime['type'], ['image/jpeg', 'image/png', 'image/webp'], true)) {
+            return $this->error(__('The recipe image must be a JPEG, PNG or WebP file.', 'plugixa-recipe'));
+        }
 
         // Validate at least one category (the service's first check in store()).
         $categories_input = $is_multipart
@@ -202,33 +236,18 @@ class SubmissionsController extends PublicController {
 
         $recipe_id = $submission['id'];
 
-        // Image upload (with server-side MIME verification).
-        if (!empty($_FILES['recipe_image']) && !empty($_FILES['recipe_image']['size'])) {
-            // phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- The whole upload entry is handed to Uploader::store(), which sanitizes the name and re-checks the type itself; the members are validated below against the MIME allow-list and max_upload_size.
-            $file          = $_FILES['recipe_image'];
-            // phpcs:enable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-            $allowed_types = ['image/jpeg', 'image/png', 'image/webp'];
-            $max_size      = ((int) ($settings['max_upload_size'] ?? 5)) * 1024 * 1024;
-            $real_mime     = wp_check_filetype_and_ext($file['tmp_name'], $file['name']);
-
-            if (empty($real_mime['type']) || !in_array($real_mime['type'], $allowed_types, true)) {
-                // Non-blocking: skip file with invalid or mismatched MIME type.
-            } elseif ($file['size'] > $max_size) {
-                // Non-blocking: skip oversized file.
-            } else {
-                // Like the gallery below: the browser's name and type are not passed on.
-                // The name is sanitised and the type is the MIME just derived from the file.
-                $attachment_id = Uploader::store([
-                    'name'     => sanitize_file_name($file['name']),
-                    'type'     => $real_mime['type'],
-                    'tmp_name' => $file['tmp_name'],
-                    'error'    => $file['error'],
-                    'size'     => $file['size'],
-                ]);
-                if (!is_wp_error($attachment_id)) {
-                    $this->submissions->attach_image($recipe_id, $attachment_id);
-                }
-            }
+        // The recipe image: its type and size were checked before the insert. Like the
+        // gallery below, the browser's name and type are not passed on - the name is
+        // sanitised and the type is the MIME derived from the file.
+        $attachment_id = Uploader::store([
+            'name'     => sanitize_file_name($image_file['name']),
+            'type'     => $image_mime['type'],
+            'tmp_name' => $image_file['tmp_name'],
+            'error'    => $image_file['error'],
+            'size'     => $image_file['size'],
+        ]);
+        if (!is_wp_error($attachment_id)) {
+            $this->submissions->attach_image($recipe_id, $attachment_id);
         }
 
         // Gallery images upload (multiple files, max 10).
@@ -273,6 +292,42 @@ class SubmissionsController extends PublicController {
             }
         }
 
+        // Step photos: one file per step that has one, sent as step_images[<n>] where <n> is
+        // the number the step's `image_index` names. At most 8, so that with the featured
+        // image and ten gallery images the request stays under PHP's default of 20 files.
+        $step_image_ids = [];
+        if (!empty($_FILES['step_images']) && is_array($_FILES['step_images']['name'] ?? null)) {
+            $allowed_types = ['image/jpeg', 'image/png', 'image/webp'];
+            $max_size      = ((int) ($settings['max_upload_size'] ?? 5)) * 1024 * 1024;
+            $max_steps     = 8;
+
+            // phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.InputNotValidated -- Scoped to this upload loop, exactly as the gallery loop above: tmp_name/error/size are PHP-generated upload metadata that must reach Uploader::store() byte-for-byte and are validated instead (error === UPLOAD_ERR_OK, size against max_upload_size, count against a cap, real MIME via wp_check_filetype_and_ext() against an allow-list). name IS sanitized and type IS replaced by the derived MIME. The array keys are cast to int.
+            foreach (array_slice(array_keys($_FILES['step_images']['name']), 0, $max_steps) as $step_key) {
+                $step_index = (int) $step_key;
+                if (($_FILES['step_images']['error'][$step_key] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
+                if (($_FILES['step_images']['size'][$step_key] ?? 0) > $max_size) continue;
+
+                // Server-side MIME verification.
+                $step_mime = wp_check_filetype_and_ext(
+                    $_FILES['step_images']['tmp_name'][$step_key],
+                    $_FILES['step_images']['name'][$step_key]
+                );
+                if (empty($step_mime['type']) || !in_array($step_mime['type'], $allowed_types, true)) continue;
+
+                $att_id = Uploader::store([
+                    'name'     => sanitize_file_name($_FILES['step_images']['name'][$step_key]),
+                    'type'     => $step_mime['type'],
+                    'tmp_name' => $_FILES['step_images']['tmp_name'][$step_key],
+                    'error'    => $_FILES['step_images']['error'][$step_key],
+                    'size'     => $_FILES['step_images']['size'][$step_key],
+                ]);
+                if (!is_wp_error($att_id)) {
+                    $step_image_ids[$step_index] = (int) $att_id;
+                }
+            }
+            // phpcs:enable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.InputNotValidated
+        }
+
         // Save categories (array of IDs → junction table, with FK validation).
         $categories = $is_multipart
             ? array_map('intval', (array) wp_unslash($_POST['categories'] ?? []))
@@ -290,6 +345,7 @@ class SubmissionsController extends PublicController {
             'ingredients'  => $get_param('ingredients', ''),
             'instructions' => $get_param('instructions', ''),
             'nutrition'    => $get_param('nutrition', ''),
+            'step_images'  => $step_image_ids,
         ], $get_param);
 
         return $this->success([

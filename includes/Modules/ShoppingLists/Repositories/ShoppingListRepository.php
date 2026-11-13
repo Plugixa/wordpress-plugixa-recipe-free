@@ -179,6 +179,52 @@ final class ShoppingListRepository extends Repository {
         });
     }
 
+    /**
+     * The list the public shopping-list page keeps for a user. It has a status of its own
+     * (`personal`): a list the same person made in the admin is `active`, and replacing
+     * every line of THAT from a page in their browser would be a loss. Uncached - it
+     * decides where a write goes.
+     */
+    public function personal_list_id(int $user_id): int {
+        global $wpdb;
+
+        return (int) $wpdb->get_var($wpdb->prepare(
+            'SELECT id FROM %i WHERE user_id = %d AND status = %s ORDER BY id DESC LIMIT 1',
+            $this->table('shopping_lists'),
+            $user_id,
+            'personal'
+        ));
+    }
+
+    /**
+     * Replace every line of a user's OWN list. The list is matched on its owner as well
+     * as its id, so a wrong id rewrites nothing.
+     *
+     * @param array<int, array<string, mixed>> $rows Item rows WITHOUT shopping_list_id.
+     */
+    public function replace_personal_items(int $list_id, int $user_id, array $rows): void {
+        global $wpdb;
+
+        $owned = (int) $wpdb->get_var($wpdb->prepare(
+            'SELECT id FROM %i WHERE id = %d AND user_id = %d',
+            $this->table('shopping_lists'),
+            $list_id,
+            $user_id
+        ));
+        if (!$owned) {
+            return;
+        }
+
+        $wpdb->delete($this->table('shopping_list_items'), ['shopping_list_id' => $owned]);
+        foreach ($rows as $row) {
+            $wpdb->insert($this->table('shopping_list_items'), array_merge(['shopping_list_id' => $owned], $row));
+        }
+        $wpdb->update($this->table('shopping_lists'), ['modified_at' => current_time('mysql')], ['id' => $owned]);
+
+        // Content write.
+        $this->flush();
+    }
+
     /** The highest sort_order in the list, 0 when it is empty. */
     public function max_item_order(int $id): int {
         global $wpdb;

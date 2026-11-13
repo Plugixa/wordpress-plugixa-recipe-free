@@ -42,10 +42,15 @@ final class Assets {
         if ($layout_style === 'form') {
             $form_js = PLUGIXA_RECIPE_PATH . 'assets/frontend/js/recipe-form.js';
             if (file_exists($form_js)) {
+                // The two scripts the form is built on. The parser is the SAME file the admin
+                // editor imports, so a pasted line means one thing on both sides.
+                wp_register_script('plugixa-recipe-parser', PLUGIXA_RECIPE_URL . 'assets/frontend/js/recipe-text-parser.js', [], PLUGIXA_RECIPE_VERSION, true);
+                wp_register_script('plugixa-recipe-sortable', PLUGIXA_RECIPE_URL . 'assets/frontend/js/sortable-list.js', [], PLUGIXA_RECIPE_VERSION, true);
+
                 wp_enqueue_script(
                     'plugixa-recipe-form',
                     PLUGIXA_RECIPE_URL . 'assets/frontend/js/recipe-form.js',
-                    [],
+                    ['plugixa-recipe-parser', 'plugixa-recipe-sortable'],
                     PLUGIXA_RECIPE_VERSION,
                     true
                 );
@@ -103,35 +108,65 @@ final class Assets {
                 true
             );
 
-            wp_localize_script('plugixa-recipe-frontend', 'plugixaRecipeConfig', [
-                'ajaxUrl'    => admin_url('admin-ajax.php'),
-                'restUrl'    => esc_url_raw(rest_url('plugixa-recipe/v1/')),
-                'nonce'      => wp_create_nonce('plugixa_recipe_frontend'),
-                'restNonce'  => plugixa_recipe_rest_nonce(),
-                'isLoggedIn' => is_user_logged_in(),
-                'loginUrl'   => wp_login_url(get_permalink()),
-                'i18n'       => [
-                    'loadMore'  => __('Load More Recipes', 'plugixa-recipe'),
-                    'loading'   => __('Loading...', 'plugixa-recipe'),
-                    'noMore'    => __('No more recipes to load.', 'plugixa-recipe'),
-                    'error'     => __('An error occurred while loading recipes.', 'plugixa-recipe'),
-                    'tooltip'   => [
-                        'like'       => __('Like this recipe', 'plugixa-recipe'),
-                        'likeActive' => __('Unlike this recipe', 'plugixa-recipe'),
-                        'save'       => __('Save to favorites', 'plugixa-recipe'),
-                        'saveActive' => __('Remove from saved', 'plugixa-recipe'),
-                        'loginLike'  => __('Log in to like this recipe', 'plugixa-recipe'),
-                        'loginSave'  => __('Log in to save this recipe', 'plugixa-recipe'),
-                        'loginLink'  => __('Log in', 'plugixa-recipe'),
-                    ],
-                ],
-            ]);
+            self::localize_config();
         }
 
         // Auto dark mode: toggle pxr-dark class based on OS preference
         wp_add_inline_script('plugixa-recipe-frontend', '(function(){var e=document.querySelectorAll("[data-pxr-dark-mode=auto]");if(!e.length)return;var m=window.matchMedia("(prefers-color-scheme:dark)");function t(q){e.forEach(function(el){el.classList.toggle("pxr-dark",q.matches)})}t(m);m.addEventListener("change",t)})();');
 
         self::$listing_enqueued = true;
+    }
+
+    /**
+     * Print `plugixaRecipeConfig` for recipes.js - the whole object, once per page.
+     *
+     * Four places used to print it, each with the keys it happened to need, and
+     * wp_localize_script() APPENDS: the last declaration on the page replaced the others.
+     * On a recipe's page that was the related-recipes widget's, which carried no
+     * `reviewHelpfulEnabled` - so the "Helpful" button under a review did nothing at all.
+     * Every key is here, for every page, and a second call adds nothing.
+     *
+     * No REST nonce for a visitor (plugixa_recipe_rest_nonce()): the page is cached.
+     *
+     * @param string|null $return_to Where "log in" brings the visitor back to; the page
+     *                               being read when null.
+     */
+    public static function localize_config(?string $return_to = null): void {
+        if (false !== strpos((string) wp_scripts()->get_data('plugixa-recipe-frontend', 'data'), 'plugixaRecipeConfig')) {
+            return;
+        }
+
+        $settings = (array) get_option('plugixa_recipe_settings', []);
+
+        wp_localize_script('plugixa-recipe-frontend', 'plugixaRecipeConfig', [
+            'ajaxUrl'              => admin_url('admin-ajax.php'),
+            'restUrl'              => esc_url_raw(rest_url('plugixa-recipe/v1/')),
+            'nonce'                => wp_create_nonce('plugixa_recipe_frontend'),
+            'restNonce'            => plugixa_recipe_rest_nonce(),
+            'isLoggedIn'           => is_user_logged_in(),
+            'loginUrl'             => wp_login_url($return_to ?? plugixa_recipe_current_url()),
+            'reviewsPerPage'       => (int) ($settings['reviews_per_page'] ?? 10),
+            'reviewHelpfulEnabled' => !empty($settings['review_enable_helpful_votes']),
+            'i18n'                 => [
+                'loadMore'    => __('Load More Recipes', 'plugixa-recipe'),
+                'loading'     => __('Loading...', 'plugixa-recipe'),
+                'noMore'      => __('No more recipes to load.', 'plugixa-recipe'),
+                'error'       => __('An error occurred while loading recipes.', 'plugixa-recipe'),
+                'pleaseLogIn' => __('Please log in', 'plugixa-recipe'),
+                'helpful'     => __('Helpful', 'plugixa-recipe'),
+                /* translators: %d: how many readers found a review helpful. */
+                'helpfulCount' => __('Helpful (%d)', 'plugixa-recipe'),
+                'tooltip'     => [
+                    'like'       => __('Like this recipe', 'plugixa-recipe'),
+                    'likeActive' => __('Unlike this recipe', 'plugixa-recipe'),
+                    'save'       => __('Save to favorites', 'plugixa-recipe'),
+                    'saveActive' => __('Remove from saved', 'plugixa-recipe'),
+                    'loginLike'  => __('Log in to like this recipe', 'plugixa-recipe'),
+                    'loginSave'  => __('Log in to save this recipe', 'plugixa-recipe'),
+                    'loginLink'  => __('Log in', 'plugixa-recipe'),
+                ],
+            ],
+        ]);
     }
 
     /**
@@ -163,25 +198,7 @@ final class Assets {
                 true
             );
 
-            wp_localize_script( 'plugixa-recipe-frontend', 'plugixaRecipeConfig', [
-                'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
-                'restUrl'    => esc_url_raw( rest_url( 'plugixa-recipe/v1/' ) ),
-                'nonce'      => wp_create_nonce( 'plugixa_recipe_frontend' ),
-                'restNonce'  => plugixa_recipe_rest_nonce(),
-                'isLoggedIn' => is_user_logged_in(),
-                'loginUrl'   => wp_login_url( get_permalink() ),
-                'i18n'       => [
-                    'tooltip' => [
-                        'like'       => __( 'Like this recipe', 'plugixa-recipe' ),
-                        'likeActive' => __( 'Unlike this recipe', 'plugixa-recipe' ),
-                        'save'       => __( 'Save to favorites', 'plugixa-recipe' ),
-                        'saveActive' => __( 'Remove from saved', 'plugixa-recipe' ),
-                        'loginLike'  => __( 'Log in to like this recipe', 'plugixa-recipe' ),
-                        'loginSave'  => __( 'Log in to save this recipe', 'plugixa-recipe' ),
-                        'loginLink'  => __( 'Log in', 'plugixa-recipe' ),
-                    ],
-                ],
-            ] );
+            self::localize_config();
         }
 
         self::$widgets_enqueued = true;

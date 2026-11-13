@@ -45,7 +45,7 @@ final class Strings {
             'settings_reviews'          => __('Reviews', 'plugixa-recipe'),
             'settings_reviews_hint'     => __('How recipe reviews are collected and shown.', 'plugixa-recipe'),
             'settings_seo'              => __('SEO', 'plugixa-recipe'),
-            'settings_seo_hint'         => __('Meta tags, social cards and the sitemap.', 'plugixa-recipe'),
+            'settings_seo_hint'         => __('Meta tags and social cards.', 'plugixa-recipe'),
             'settings_performance'      => __('Performance', 'plugixa-recipe'),
             'settings_performance_hint' => __('Loading speed and caching.', 'plugixa-recipe'),
             'settings_api'              => __('API', 'plugixa-recipe'),

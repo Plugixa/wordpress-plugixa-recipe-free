@@ -4,7 +4,7 @@
  * Plugin Name: Plugixa Recipe
  * Plugin URI: https://www.plugixa.com/plugins/plugixa-recipe
  * Description: A modern recipe management plugin with React admin panel, nutrition facts, user reviews, collections, meal planning, and multiple display layouts.
- * Version: 1.0.1
+ * Version: 1.2.0
  * Author: Plugixa
  * Author URI: https://plugixa.com
  * Copyright (C) 2026 Plugixa (https://plugixa.com)
@@ -38,7 +38,7 @@ if ( function_exists( 'plugixa_recipe_fs_pxr' ) ) {
     return;
 }
 // Plugin constants
-define( 'PLUGIXA_RECIPE_VERSION', '1.0.1' );
+define( 'PLUGIXA_RECIPE_VERSION', '1.2.0' );
 define( 'PLUGIXA_RECIPE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'PLUGIXA_RECIPE_URL', plugin_dir_url( __FILE__ ) );
 define( 'PLUGIXA_RECIPE_BASENAME', plugin_basename( __FILE__ ) );
@@ -77,6 +77,9 @@ if ( !function_exists( 'plugixa_recipe_fs_pxr' ) ) {
                 'is_org_compliant' => true,
                 'menu'             => array(
                     'slug'    => 'plugixa-recipe',
+                    'account' => false,
+                    'contact' => false,
+                    'pricing' => false,
                     'support' => false,
                 ),
                 'is_live'          => true,

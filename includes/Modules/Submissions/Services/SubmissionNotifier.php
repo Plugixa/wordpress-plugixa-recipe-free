@@ -48,7 +48,7 @@ final class SubmissionNotifier {
             '{servings}'     => $recipe_data['servings'] ?? '4',
             '{site_name}'    => get_bloginfo('name'),
             '{site_url}'     => home_url(),
-            '{admin_url}'    => admin_url('admin.php?page=plugixa-recipe-recipes'),
+            '{admin_url}'    => admin_url('admin.php?page=plugixa-recipe#/recipes'),
             '{date}'         => wp_date(get_option('date_format') . ' ' . get_option('time_format')),
         ];
 
@@ -74,7 +74,7 @@ final class SubmissionNotifier {
             __('New Recipe Submission', 'plugixa-recipe'),
             $message_text,
             $details,
-            admin_url('admin.php?page=plugixa-recipe-recipes'),
+            admin_url('admin.php?page=plugixa-recipe#/recipes'),
             __('Review Submissions', 'plugixa-recipe')
         );
 

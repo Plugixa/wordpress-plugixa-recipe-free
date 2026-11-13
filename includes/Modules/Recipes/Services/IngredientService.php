@@ -56,17 +56,7 @@ final class IngredientService {
 
         $rows = [];
         foreach ($ingredients as $ing) {
-            $rows[] = [
-                'recipe_id'   => $recipe_id,
-                'group_name'  => sanitize_text_field($ing['group_name'] ?? ''),
-                'group_order' => (int) ($ing['group_order'] ?? 0),
-                'sort_order'  => (int) ($ing['sort_order'] ?? 0),
-                'quantity'    => sanitize_text_field($ing['quantity'] ?? ''),
-                'unit'        => sanitize_text_field($ing['unit'] ?? ''),
-                'name'        => sanitize_text_field($ing['name'] ?? ''),
-                'notes'       => sanitize_text_field($ing['notes'] ?? ''),
-                'link_url'    => esc_url_raw($ing['link_url'] ?? ''),
-            ];
+            $rows[] = ChildRows::ingredient($recipe_id, $ing);
         }
 
         $this->ingredients->replace($recipe_id, $rows, current_time('mysql'), get_current_user_id());

@@ -63,7 +63,23 @@ class MetaTags {
             $image_url = wp_get_attachment_image_url((int) $recipe->image_id, 'large') ?: '';
         }
 
-        $page_url = get_permalink();
+        // Not get_permalink(): a recipe URL is a rewrite rule over the blog query, so the
+        // "current post" there is the newest blog post, and its URL is what this printed.
+        $page_url = $recipe->permalink ?? plugixa_recipe_permalink((int) ($recipe->id ?? 0), (string) ($recipe->slug ?? ''));
+
+        // A published post that embeds this recipe whole is the address to index; this
+        // page then says so, and shares point there too.
+        $embedding_post = (new \PlugixaRecipe\Modules\Recipes\Services\CanonicalPosts())->url_for((int) ($recipe->id ?? 0));
+
+        /**
+         * Filters the canonical URL of a recipe's own page.
+         *
+         * @since 1.2.0
+         *
+         * @param string $url    The post that embeds the recipe, or the recipe's own URL.
+         * @param object $recipe The presented recipe.
+         */
+        $page_url = (string) apply_filters('plugixa_recipe_canonical_url', '' !== $embedding_post ? $embedding_post : $page_url, $recipe);
 
         echo "\n<!-- PlugixaRecipe SEO Meta Tags -->\n";
 

@@ -50,7 +50,7 @@ if ( ! $allow_guests && ! $is_logged_in ) {
     printf(
         /* translators: 1: opening anchor tag for the login link, 2: closing anchor tag. */
         esc_html__( 'Please %1$slog in%2$s to leave a review.', 'plugixa-recipe' ),
-        '<a href="' . esc_url( wp_login_url( get_permalink() ) ) . '" class="pxr:underline pxr:font-medium">',
+        '<a href="' . esc_url( wp_login_url( plugixa_recipe_current_url() ) ) . '" class="pxr:underline pxr:font-medium">',
         '</a>'
     );
     echo '</p></div>';

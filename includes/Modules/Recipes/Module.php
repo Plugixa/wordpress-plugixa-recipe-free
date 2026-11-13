@@ -15,7 +15,11 @@ use PlugixaRecipe\Modules\Recipes\Http\CoursesController;
 use PlugixaRecipe\Modules\Recipes\Http\UnitsController;
 use PlugixaRecipe\Modules\Recipes\Frontend\ArchivePage;
 use PlugixaRecipe\Modules\Recipes\Frontend\MetaTags;
+use PlugixaRecipe\Modules\Recipes\Frontend\SitemapProvider;
+use PlugixaRecipe\Modules\Recipes\Frontend\Surprise;
 use PlugixaRecipe\Modules\Recipes\Frontend\PrintPage;
+use PlugixaRecipe\Modules\Recipes\Frontend\RecipeEmbed;
+use PlugixaRecipe\Modules\Recipes\Services\CanonicalPosts;
 use PlugixaRecipe\Modules\Recipes\Frontend\SinglePage;
 
 defined('ABSPATH') || exit;
@@ -63,14 +67,23 @@ final class Module extends AbstractModule {
      *
      * The order is load-bearing and is the order these were always wired in: the archive
      * first, because it owns the rewrite flush that the single and print rules rely on;
-     * the single page last. Recipe JSON-LD is not here - it is a premium module, and the
-     * free build emits schema.org microdata from the templates instead.
+     * the single page last. Recipe JSON-LD is not here - it is the Schema module's, which
+     * reads what these pages registered in RenderedRecipes.
      */
     public function registerHooks(): void {
         (new ArchivePage())->init();
         (new MetaTags())->init();
         (new PrintPage())->init();
         (new SinglePage())->init();
+        // One recipe inside a post: [plugixa_single_recipe], the round-up, the jump buttons.
+        (new RecipeEmbed())->init();
+        // ...and the recipe's own page then names that post as its canonical.
+        (new CanonicalPosts())->init();
+        // [plugixa_surprise_recipe]: a link that opens a recipe picked at random.
+        (new Surprise())->init();
+
+        // Recipes are not posts, so core's sitemap lists them only through this.
+        add_action('init', [SitemapProvider::class, 'register']);
     }
 
     public function registerRoutes(): void {

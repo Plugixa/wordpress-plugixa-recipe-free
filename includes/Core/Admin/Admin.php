@@ -14,41 +14,56 @@ defined( 'ABSPATH' ) || exit;
  */
 class Admin {
 
+    private const SLUG = 'plugixa-recipe';
+
+    /**
+     * The page slugs the admin had while every screen was its own submenu, and the app
+     * route each one opened. Notification emails already delivered link to them.
+     */
+    private const LEGACY_PAGES = [
+        'plugixa-recipe-recipes'      => '/recipes',
+        'plugixa-recipe-categories'   => '/categories',
+        'plugixa-recipe-cuisines'     => '/cuisines',
+        'plugixa-recipe-reviews'      => '/reviews',
+        'plugixa-recipe-collections'  => '/collections',
+        'plugixa-recipe-views'        => '/views',
+        'plugixa-recipe-shortcodes'   => '/shortcodes',
+        'plugixa-recipe-settings'     => '/settings',
+    ];
+
+    /**
+     * One entry in the WordPress sidebar: every screen is a route inside the app, which
+     * draws its own navigation.
+     */
     public function add_admin_menu(): void {
-        $icon = 'dashicons-food';
+        $this->redirect_legacy_page();
 
         add_menu_page(
             __('Plugixa Recipe', 'plugixa-recipe'),
-            __('Recipes', 'plugixa-recipe'),
+            __('Plugixa Recipe', 'plugixa-recipe'),
             'edit_posts',
-            'plugixa-recipe',
+            self::SLUG,
             [$this, 'render_app'],
-            $icon,
+            'dashicons-food',
             26
         );
+    }
 
-        $submenus = [
-            'plugixa-recipe'              => __('Dashboard', 'plugixa-recipe'),
-            'plugixa-recipe-recipes'      => __('Recipes', 'plugixa-recipe'),
-            'plugixa-recipe-categories'   => __('Categories', 'plugixa-recipe'),
-            'plugixa-recipe-cuisines'     => __('Cuisines', 'plugixa-recipe'),
-            'plugixa-recipe-reviews'      => __('Reviews', 'plugixa-recipe'),
-            'plugixa-recipe-collections'  => __('Collections', 'plugixa-recipe'),
-            'plugixa-recipe-views'        => __('Views', 'plugixa-recipe'),
-            'plugixa-recipe-shortcodes'   => __('Shortcodes', 'plugixa-recipe'),
-            'plugixa-recipe-settings'     => __('Settings', 'plugixa-recipe'),
-        ];
-
-        foreach ($submenus as $slug => $title) {
-            add_submenu_page(
-                'plugixa-recipe',
-                $title,
-                $title,
-                'edit_posts',
-                $slug,
-                [$this, 'render_app']
-            );
+    /**
+     * Sends an old submenu URL to the same screen inside the app.
+     *
+     * Runs on `admin_menu` because WordPress refuses a page slug nobody registered as soon
+     * as that action returns - before `admin_init`, so a redirect hooked there never runs.
+     */
+    private function redirect_legacy_page(): void {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only page routing, no state change.
+        $page = isset($_GET['page']) ? sanitize_text_field(wp_unslash($_GET['page'])) : '';
+        if (!isset(self::LEGACY_PAGES[$page])) {
+            return;
         }
+
+        wp_safe_redirect(admin_url('admin.php?page=' . self::SLUG . '#' . self::LEGACY_PAGES[$page]));
+        exit;
     }
 
     public function render_app(): void {

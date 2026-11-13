@@ -68,17 +68,7 @@ final class InstructionService {
 
         $rows = [];
         foreach ($instructions as $inst) {
-            $rows[] = [
-                'recipe_id'        => $recipe_id,
-                'group_name'       => sanitize_text_field($inst['group_name'] ?? ''),
-                'group_order'      => (int) ($inst['group_order'] ?? 0),
-                'sort_order'       => (int) ($inst['sort_order'] ?? 0),
-                'title'            => sanitize_text_field($inst['title'] ?? ''),
-                'instruction_text' => wp_kses_post($inst['instruction_text'] ?? $inst['text'] ?? ''),
-                'image_id'         => !empty($inst['image_id']) ? (int) $inst['image_id'] : null,
-                'video_url'        => esc_url_raw($inst['video_url'] ?? ''),
-                'duration'         => isset($inst['duration']) ? (int) $inst['duration'] : null,
-            ];
+            $rows[] = ChildRows::instruction($recipe_id, $inst);
         }
 
         $this->instructions->replace($recipe_id, $rows, current_time('mysql'), get_current_user_id());

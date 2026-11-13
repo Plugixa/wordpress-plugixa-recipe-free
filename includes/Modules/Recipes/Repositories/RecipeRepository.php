@@ -455,6 +455,47 @@ final class RecipeRepository extends Repository {
     }
 
     /**
+     * Ingredient names already in use, most used first - what the editor suggests while
+     * an author types one.
+     *
+     * @return string[]
+     */
+    public function ingredient_names(int $limit): array {
+        global $wpdb;
+
+        return (array) $this->remember("suggest:ingredients:{$limit}", function () use ($wpdb, $limit) {
+            return $wpdb->get_col(
+                $wpdb->prepare(
+                    'SELECT name FROM %i WHERE name <> %s GROUP BY name ORDER BY COUNT(*) DESC, name ASC LIMIT %d',
+                    $this->table('ingredients'),
+                    '',
+                    $limit
+                )
+            );
+        });
+    }
+
+    /**
+     * The stored tag and equipment lists (JSON) of the newest recipes that hold either.
+     *
+     * @return array<int, array{tags: ?string, equipment: ?string}>
+     */
+    public function label_lists(int $limit): array {
+        global $wpdb;
+
+        return (array) $this->remember("suggest:labels:{$limit}", function () use ($wpdb, $limit) {
+            return $wpdb->get_results(
+                $wpdb->prepare(
+                    'SELECT tags, equipment FROM %i WHERE tags IS NOT NULL OR equipment IS NOT NULL ORDER BY id DESC LIMIT %d',
+                    $this->table('recipes'),
+                    $limit
+                ),
+                ARRAY_A
+            );
+        });
+    }
+
+    /**
      * Close a create: the row, its pivots and child rows are written and the
      * plugixa_recipe_save_recipe action has fired.
      *

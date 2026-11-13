@@ -7,6 +7,8 @@
 
 namespace PlugixaRecipe\Modules\Shortcodes\Frontend\Widgets;
 
+use PlugixaRecipe\Modules\Shortcodes\Frontend\VisitorFilters;
+
 // phpcs:disable WordPressVIPMinimum.Performance.WPQueryParams -- False positive: this file contains no get_posts()/WP_Query call. "exclude" here is a SHORTCODE attribute naming plugin-owned custom-table category/cuisine IDs to omit; it is absint()-mapped and bound as %d placeholders, and never reaches WP_Query.
 
 defined( 'ABSPATH' ) || exit;
@@ -37,13 +39,15 @@ final class RecipeSearchWidget extends Widget {
 
         $this->enqueue_assets();
 
-        // For expanded style, load categories and cuisines
+        // The expanded form offers every filter a listing can be narrowed by.
         $categories = [];
         $cuisines   = [];
+        $courses    = [];
         if ( $atts['style'] === 'expanded' ) {
             // Read-through object cache; these queries take no inputs.
             $categories = $this->widgets()->search_categories();
             $cuisines   = $this->widgets()->search_cuisines();
+            $courses    = $this->widgets()->search_courses();
         }
 
         $form = $this->render_template( 'recipe-search', [
@@ -53,6 +57,9 @@ final class RecipeSearchWidget extends Widget {
             'title'       => sanitize_text_field( $atts['title'] ),
             'categories'  => $categories,
             'cuisines'    => $cuisines,
+            'courses'     => $courses,
+            // What the visitor already chose, narrowed the same way the listing reads it.
+            'current'     => VisitorFilters::read(),
             'unique_id'   => 'pxr-widget-' . uniqid(),
         ] );
 
@@ -80,10 +87,7 @@ final class RecipeSearchWidget extends Widget {
             return '';
         }
 
-        // phpcs:disable WordPress.Security.NonceVerification.Recommended -- presence check of the read-only public search fields; see ListingShortcode::with_visitor_search().
-        $submitted = ! empty( $_GET['plugixa_recipe_search'] ) || ! empty( $_GET['plugixa_recipe_category'] ) || ! empty( $_GET['plugixa_recipe_cuisine'] );
-        // phpcs:enable WordPress.Security.NonceVerification.Recommended
-        if ( ! $submitted ) {
+        if ( ! VisitorFilters::submitted() ) {
             return '';
         }
 

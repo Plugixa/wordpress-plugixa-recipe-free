@@ -28,18 +28,26 @@ defined( 'ABSPATH' ) || exit;
 // Recipe data extraction.
 $recipe_id         = isset( $recipe->id ) ? absint( $recipe->id ) : 0;
 $recipe_title             = isset( $recipe->title ) ? $recipe->title : '';
+// h1 on the recipe's own page; a recipe embedded in a post is an h2 under the post's title.
+$title_level       = isset( $title_level ) ? min( 6, max( 1, (int) $title_level ) ) : 1;
 $description       = isset( $recipe->description ) ? $recipe->description : '';
 $image_url         = isset( $recipe->image_url ) ? $recipe->image_url : '';
 $image_alt         = isset( $recipe->image_alt ) ? $recipe->image_alt : $recipe_title;
 $author_name       = isset( $recipe->author_name ) ? $recipe->author_name : '';
 $published_date    = isset( $recipe->published_date ) ? $recipe->published_date : '';
+// <time datetime> takes ISO 8601; the formatted date was printed there too.
+$published_iso     = isset( $recipe->published_iso ) ? $recipe->published_iso : '';
 $rating            = isset( $recipe->rating ) ? floatval( $recipe->rating ) : 0;
 $rating_count      = isset( $recipe->rating_count ) ? absint( $recipe->rating_count ) : 0;
 $prep_time         = isset( $recipe->prep_time ) ? absint( $recipe->prep_time ) : 0;
 $cook_time         = isset( $recipe->cook_time ) ? absint( $recipe->cook_time ) : 0;
-$total_time        = $prep_time + $cook_time;
+// The stored column counts rest time too; the sum is for a caller that did not select it.
+$total_time        = isset( $recipe->total_time )
+    ? absint( $recipe->total_time )
+    : $prep_time + $cook_time + ( isset( $recipe->rest_time ) ? absint( $recipe->rest_time ) : 0 );
 $servings          = isset( $recipe->servings ) ? absint( $recipe->servings ) : 0;
-$difficulty        = isset( $recipe->difficulty ) ? $recipe->difficulty : '';
+// The label ("Easy"); a caller that passes only the stored value shows that.
+$difficulty        = ! empty( $recipe->difficulty_label ) ? $recipe->difficulty_label : ( isset( $recipe->difficulty ) ? $recipe->difficulty : '' );
 $cuisine           = isset( $recipe->cuisine ) ? $recipe->cuisine : '';
 $diet_badges       = isset( $recipe->diet_badges ) && is_array( $recipe->diet_badges ) ? $recipe->diet_badges : array();
 $categories        = isset( $recipe->categories ) && is_array( $recipe->categories ) ? $recipe->categories : array();
@@ -81,7 +89,7 @@ $plugixa_recipe_global_settings = get_option( 'plugixa_recipe_settings', [] );
 if ( ! plugixa_recipe_app_enabled( 'nutrition' ) ) {
     $show_nutrition = false;
 }
-// Ratings are the Reviews module's data: the badges (and their aggregateRating microdata)
+// Ratings are the Reviews module's data: the badges
 // follow the module, not the per-view show_reviews option, which only hides the list.
 $reviews_app_on = plugixa_recipe_app_enabled( 'reviews' );
 if ( ! $reviews_app_on ) {
@@ -114,9 +122,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
 <div id="<?php echo esc_attr( $unique_id ); ?>"
      class="pxr-custom-single pxr:mx-auto"
      style="<?php echo esc_attr( $css_vars_style ); ?>"
-     data-pxr-recipe-id="<?php echo esc_attr( $recipe_id ); ?>"
-     itemscope
-     itemtype="https://schema.org/Recipe">
+     data-pxr-recipe-id="<?php echo esc_attr( $recipe_id ); ?>">
 
     <!-- Hero Section -->
     <header class="pxr-custom-single__hero pxr:mb-8">
@@ -126,10 +132,23 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
 
                 <!-- LEFT COLUMN: Image -->
                 <div class="pxr-custom-single__hero-image-col">
-                    <img src="<?php echo esc_url( $image_url ); ?>"
-                         alt="<?php echo esc_attr( $image_alt ); ?>"
-                         class="pxr-custom-single__hero-img"
-                         itemprop="image" />
+                    <div class="pxr-custom-single__hero-image-wrap">
+                        <img src="<?php echo esc_url( $image_url ); ?>"
+                             alt="<?php echo esc_attr( $image_alt ); ?>"
+                             class="pxr-custom-single__hero-img" />
+                        <?php if ( $show_share && $share_url ) : ?>
+                            <?php // A link, not Pinterest's script: nothing is loaded from Pinterest until the visitor presses it. ?>
+                            <a class="pxr-custom-single__pin"
+                               href="https://www.pinterest.com/pin/create/button/?url=<?php echo rawurlencode( $share_url ); ?>&amp;media=<?php echo rawurlencode( $image_url ); ?>&amp;description=<?php echo rawurlencode( $recipe_title ); ?>"
+                               target="_blank" rel="noopener noreferrer nofollow">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                    <path d="M12 0a12 12 0 00-4.373 23.17c-.1-.937-.19-2.38.04-3.406l1.315-5.572s-.336-.672-.336-1.664c0-1.558.904-2.721 2.028-2.721.956 0 1.418.718 1.418 1.579 0 .962-.613 2.4-.928 3.732-.264 1.114.559 2.022 1.658 2.022 1.99 0 3.52-2.098 3.52-5.126 0-2.68-1.926-4.555-4.677-4.555-3.186 0-5.056 2.39-5.056 4.86 0 .962.37 1.994.833 2.555a.335.335 0 01.078.321c-.085.354-.274 1.114-.311 1.27-.049.205-.162.248-.374.149-1.398-.651-2.272-2.695-2.272-4.337 0-3.531 2.566-6.774 7.397-6.774 3.883 0 6.901 2.767 6.901 6.465 0 3.858-2.432 6.963-5.808 6.963-1.134 0-2.2-.59-2.565-1.286l-.698 2.66c-.253.973-.936 2.193-1.393 2.937A12 12 0 1012 0z"/>
+                                </svg>
+                                <?php esc_html_e( 'Pin', 'plugixa-recipe' ); ?>
+                                <span class="pxr-custom-sr-only"><?php esc_html_e( 'this recipe on Pinterest (opens in a new tab)', 'plugixa-recipe' ); ?></span>
+                            </a>
+                        <?php endif; ?>
+                    </div>
                 </div>
 
                 <!-- RIGHT COLUMN: All info + ingredients -->
@@ -145,12 +164,12 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                         </div>
                     <?php endif; ?>
 
-                    <h1 class="pxr-custom-single__title pxr:text-3xl pxr:font-bold pxr:mb-3 pxr:leading-tight" itemprop="name">
+                    <h<?php echo (int) $title_level; ?> class="pxr-custom-single__title pxr:text-3xl pxr:font-bold pxr:mb-3 pxr:leading-tight">
                         <?php echo esc_html( $recipe_title ); ?>
-                    </h1>
+                    </h<?php echo (int) $title_level; ?>>
 
                     <?php if ( $description ) : ?>
-                        <div class="pxr-custom-single__description pxr:text-base pxr:leading-relaxed pxr:mb-4 pxr:opacity-80" itemprop="description">
+                        <div class="pxr-custom-single__description pxr:text-base pxr:leading-relaxed pxr:mb-4 pxr:opacity-80">
                             <?php echo wp_kses_post( $description ); ?>
                         </div>
                     <?php endif; ?>
@@ -162,8 +181,8 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                                 <svg class="pxr:w-4 pxr:h-4 pxr:opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                                 </svg>
-                                <span itemprop="author" itemscope itemtype="https://schema.org/Person">
-                                    <span itemprop="name"><?php echo esc_html( $author_name ); ?></span>
+                                <span>
+                                    <span><?php echo esc_html( $author_name ); ?></span>
                                 </span>
                             </span>
                         <?php endif; ?>
@@ -173,19 +192,14 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                                 <svg class="pxr:w-4 pxr:h-4 pxr:opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                 </svg>
-                                <time itemprop="datePublished" datetime="<?php echo esc_attr( $published_date ); ?>">
+                                <time datetime="<?php echo esc_attr( $published_iso ); ?>">
                                     <?php echo esc_html( $published_date ); ?>
                                 </time>
                             </span>
                         <?php endif; ?>
 
                         <?php if ( $rating > 0 && $reviews_app_on ) : ?>
-                            <span class="pxr-custom-single__rating pxr:flex pxr:items-center pxr:gap-1"
-                                  itemprop="aggregateRating"
-                                  itemscope
-                                  itemtype="https://schema.org/AggregateRating">
-                                <meta itemprop="ratingValue" content="<?php echo esc_attr( $rating ); ?>" />
-                                <meta itemprop="reviewCount" content="<?php echo esc_attr( $rating_count ); ?>" />
+                            <span class="pxr-custom-single__rating pxr:flex pxr:items-center pxr:gap-1">
                                 <div class="pxr-custom-card__stars pxr:flex pxr:gap-0.5">
                                     <?php for ( $i = 1; $i <= 5; $i++ ) :
                                         $fill_class = 'pxr-custom-star--empty';
@@ -216,7 +230,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                                 </svg>
                                 <div>
                                     <span class="pxr-custom-single__info-grid-label"><?php esc_html_e( 'Prep', 'plugixa-recipe' ); ?></span>
-                                    <span class="pxr-custom-single__info-grid-value" itemprop="prepTime" content="PT<?php echo esc_attr( $prep_time ); ?>M">
+                                    <span class="pxr-custom-single__info-grid-value">
                                         <?php echo esc_html( plugixa_recipe_format_time( $prep_time ) ); ?>
                                     </span>
                                 </div>
@@ -231,7 +245,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                                 </svg>
                                 <div>
                                     <span class="pxr-custom-single__info-grid-label"><?php esc_html_e( 'Cook', 'plugixa-recipe' ); ?></span>
-                                    <span class="pxr-custom-single__info-grid-value" itemprop="cookTime" content="PT<?php echo esc_attr( $cook_time ); ?>M">
+                                    <span class="pxr-custom-single__info-grid-value">
                                         <?php echo esc_html( plugixa_recipe_format_time( $cook_time ) ); ?>
                                     </span>
                                 </div>
@@ -245,7 +259,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                                 </svg>
                                 <div>
                                     <span class="pxr-custom-single__info-grid-label"><?php esc_html_e( 'Total', 'plugixa-recipe' ); ?></span>
-                                    <span class="pxr-custom-single__info-grid-value" itemprop="totalTime" content="PT<?php echo esc_attr( $total_time ); ?>M">
+                                    <span class="pxr-custom-single__info-grid-value">
                                         <?php echo esc_html( plugixa_recipe_format_time( $total_time ) ); ?>
                                     </span>
                                 </div>
@@ -259,7 +273,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                                 </svg>
                                 <div>
                                     <span class="pxr-custom-single__info-grid-label"><?php esc_html_e( 'Servings', 'plugixa-recipe' ); ?></span>
-                                    <span class="pxr-custom-single__info-grid-value" itemprop="recipeYield" content="<?php echo esc_attr( $servings ); ?>">
+                                    <span class="pxr-custom-single__info-grid-value">
                                         <?php echo esc_html( $servings ); ?>
                                     </span>
                                 </div>
@@ -285,10 +299,12 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                                 </svg>
                                 <div>
                                     <span class="pxr-custom-single__info-grid-label"><?php esc_html_e( 'Cuisine', 'plugixa-recipe' ); ?></span>
-                                    <span class="pxr-custom-single__info-grid-value" itemprop="recipeCuisine"><?php echo esc_html( $cuisine ); ?></span>
+                                    <span class="pxr-custom-single__info-grid-value"><?php echo esc_html( $cuisine ); ?></span>
                                 </div>
                             </div>
                         <?php endif; ?>
+
+                        <?php include plugixa_recipe_template( 'single/facts.php' ); ?>
 
                     </div>
 
@@ -428,55 +444,10 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                     <?php endif; ?>
 
                     <!-- Ingredients (moved into hero right column) -->
-                    <?php if ( ! empty( $ingredient_groups ) ) : ?>
-                        <div class="pxr-custom-single__ingredients">
-                            <div class="pxr-custom-single__section pxr:p-5 pxr:rounded-lg pxr:border">
-                                <h2 class="pxr-custom-single__section-title pxr:text-lg pxr:font-bold pxr:mb-4 pxr:pb-2 pxr:border-b">
-                                    <?php esc_html_e( 'Ingredients', 'plugixa-recipe' ); ?>
-                                </h2>
-                                <?php foreach ( $ingredient_groups as $group ) : ?>
-                                    <?php if ( ! empty( $group->name ) ) : ?>
-                                        <h3 class="pxr-custom-single__group-title pxr:text-sm pxr:font-semibold pxr:uppercase pxr:tracking-wide pxr:mt-4 pxr:mb-2 pxr:opacity-70">
-                                            <?php echo esc_html( $group->name ); ?>
-                                        </h3>
-                                    <?php endif; ?>
-                                    <?php if ( ! empty( $group->items ) && is_array( $group->items ) ) : ?>
-                                        <ul class="pxr-custom-single__ingredient-list pxr:list-none pxr:p-0 pxr:m-0 pxr:space-y-2" role="list">
-                                            <?php foreach ( $group->items as $ingredient ) : ?>
-                                                <li class="pxr-custom-single__ingredient pxr:flex pxr:items-start pxr:gap-2">
-                                                    <label class="pxr:flex pxr:items-start pxr:gap-2 pxr:cursor-pointer pxr:w-full">
-                                                        <input type="checkbox"
-                                                               class="pxr-custom-checkbox pxr:mt-1 pxr:flex-shrink-0 pxr:w-4 pxr:h-4 pxr:rounded pxr:border"
-                                                               data-pxr-ingredient-check
-                                                               aria-label="<?php echo esc_attr( $ingredient->text ?? '' ); ?>" />
-                                                        <span class="pxr-custom-single__ingredient-text pxr:text-sm pxr:leading-relaxed"
-                                                              itemprop="recipeIngredient"
-                                                              data-pxr-amount="<?php echo esc_attr( $ingredient->amount ?? '' ); ?>"
-                                                              data-pxr-unit="<?php echo esc_attr( $ingredient->unit ?? '' ); ?>">
-                                                            <?php if ( ! empty( $ingredient->amount ) ) : ?>
-                                                                <strong class="pxr-custom-single__ingredient-amount" data-pxr-ingredient-amount>
-                                                                    <?php echo esc_html( $ingredient->amount ); ?>
-                                                                </strong>
-                                                            <?php endif; ?>
-                                                            <?php if ( ! empty( $ingredient->unit ) ) : ?>
-                                                                <span class="pxr-custom-single__ingredient-unit" data-pxr-ingredient-unit>
-                                                                    <?php echo esc_html( $ingredient->unit ); ?>
-                                                                </span>
-                                                            <?php endif; ?>
-                                                            <?php echo esc_html( $ingredient->name ?? $ingredient->text ?? '' ); ?>
-                                                            <?php if ( ! empty( $ingredient->notes ) ) : ?>
-                                                                <em class="pxr:opacity-60">(<?php echo esc_html( $ingredient->notes ); ?>)</em>
-                                                            <?php endif; ?>
-                                                        </span>
-                                                    </label>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        </ul>
-                                    <?php endif; ?>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    <?php endif; ?>
+                    <?php
+                    $ingredients_block_class = '';
+                    include plugixa_recipe_template( 'single/ingredients.php' );
+                    ?>
 
                 </div><!-- /.pxr-custom-single__hero-content-col -->
 
@@ -494,12 +465,12 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                 </div>
             <?php endif; ?>
 
-            <h1 class="pxr-custom-single__title pxr:text-3xl pxr:font-bold pxr:mb-3 pxr:leading-tight" itemprop="name">
+            <h<?php echo (int) $title_level; ?> class="pxr-custom-single__title pxr:text-3xl pxr:font-bold pxr:mb-3 pxr:leading-tight">
                 <?php echo esc_html( $recipe_title ); ?>
-            </h1>
+            </h<?php echo (int) $title_level; ?>>
 
             <?php if ( $description ) : ?>
-                <div class="pxr-custom-single__description pxr:text-base pxr:leading-relaxed pxr:mb-4 pxr:opacity-80" itemprop="description">
+                <div class="pxr-custom-single__description pxr:text-base pxr:leading-relaxed pxr:mb-4 pxr:opacity-80">
                     <?php echo wp_kses_post( $description ); ?>
                 </div>
             <?php endif; ?>
@@ -511,8 +482,8 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                         <svg class="pxr:w-4 pxr:h-4 pxr:opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                         </svg>
-                        <span itemprop="author" itemscope itemtype="https://schema.org/Person">
-                            <span itemprop="name"><?php echo esc_html( $author_name ); ?></span>
+                        <span>
+                            <span><?php echo esc_html( $author_name ); ?></span>
                         </span>
                     </span>
                 <?php endif; ?>
@@ -522,19 +493,14 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                         <svg class="pxr:w-4 pxr:h-4 pxr:opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                         </svg>
-                        <time itemprop="datePublished" datetime="<?php echo esc_attr( $published_date ); ?>">
+                        <time datetime="<?php echo esc_attr( $published_iso ); ?>">
                             <?php echo esc_html( $published_date ); ?>
                         </time>
                     </span>
                 <?php endif; ?>
 
                 <?php if ( $rating > 0 && $reviews_app_on ) : ?>
-                    <span class="pxr-custom-single__rating pxr:flex pxr:items-center pxr:gap-1"
-                          itemprop="aggregateRating"
-                          itemscope
-                          itemtype="https://schema.org/AggregateRating">
-                        <meta itemprop="ratingValue" content="<?php echo esc_attr( $rating ); ?>" />
-                        <meta itemprop="reviewCount" content="<?php echo esc_attr( $rating_count ); ?>" />
+                    <span class="pxr-custom-single__rating pxr:flex pxr:items-center pxr:gap-1">
                         <div class="pxr-custom-card__stars pxr:flex pxr:gap-0.5">
                             <?php for ( $i = 1; $i <= 5; $i++ ) :
                                 $fill_class = 'pxr-custom-star--empty';
@@ -564,7 +530,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                         </svg>
                         <div>
                             <span class="pxr-custom-single__info-grid-label"><?php esc_html_e( 'Prep', 'plugixa-recipe' ); ?></span>
-                            <span class="pxr-custom-single__info-grid-value" itemprop="prepTime" content="PT<?php echo esc_attr( $prep_time ); ?>M">
+                            <span class="pxr-custom-single__info-grid-value">
                                 <?php echo esc_html( plugixa_recipe_format_time( $prep_time ) ); ?>
                             </span>
                         </div>
@@ -578,7 +544,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                         </svg>
                         <div>
                             <span class="pxr-custom-single__info-grid-label"><?php esc_html_e( 'Cook', 'plugixa-recipe' ); ?></span>
-                            <span class="pxr-custom-single__info-grid-value" itemprop="cookTime" content="PT<?php echo esc_attr( $cook_time ); ?>M">
+                            <span class="pxr-custom-single__info-grid-value">
                                 <?php echo esc_html( plugixa_recipe_format_time( $cook_time ) ); ?>
                             </span>
                         </div>
@@ -591,7 +557,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                         </svg>
                         <div>
                             <span class="pxr-custom-single__info-grid-label"><?php esc_html_e( 'Total', 'plugixa-recipe' ); ?></span>
-                            <span class="pxr-custom-single__info-grid-value" itemprop="totalTime" content="PT<?php echo esc_attr( $total_time ); ?>M">
+                            <span class="pxr-custom-single__info-grid-value">
                                 <?php echo esc_html( plugixa_recipe_format_time( $total_time ) ); ?>
                             </span>
                         </div>
@@ -604,7 +570,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                         </svg>
                         <div>
                             <span class="pxr-custom-single__info-grid-label"><?php esc_html_e( 'Servings', 'plugixa-recipe' ); ?></span>
-                            <span class="pxr-custom-single__info-grid-value" itemprop="recipeYield" content="<?php echo esc_attr( $servings ); ?>">
+                            <span class="pxr-custom-single__info-grid-value">
                                 <?php echo esc_html( $servings ); ?>
                             </span>
                         </div>
@@ -628,10 +594,13 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                         </svg>
                         <div>
                             <span class="pxr-custom-single__info-grid-label"><?php esc_html_e( 'Cuisine', 'plugixa-recipe' ); ?></span>
-                            <span class="pxr-custom-single__info-grid-value" itemprop="recipeCuisine"><?php echo esc_html( $cuisine ); ?></span>
+                            <span class="pxr-custom-single__info-grid-value"><?php echo esc_html( $cuisine ); ?></span>
                         </div>
                     </div>
                 <?php endif; ?>
+
+                <?php include plugixa_recipe_template( 'single/facts.php' ); ?>
+
             </div>
 
             <!-- Action Buttons -->
@@ -744,55 +713,10 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
             <?php endif; ?>
 
             <!-- Ingredients (no-image layout) -->
-            <?php if ( ! empty( $ingredient_groups ) ) : ?>
-                <div class="pxr-custom-single__ingredients pxr:mb-6">
-                    <div class="pxr-custom-single__section pxr:p-5 pxr:rounded-lg pxr:border">
-                        <h2 class="pxr-custom-single__section-title pxr:text-lg pxr:font-bold pxr:mb-4 pxr:pb-2 pxr:border-b">
-                            <?php esc_html_e( 'Ingredients', 'plugixa-recipe' ); ?>
-                        </h2>
-                        <?php foreach ( $ingredient_groups as $group ) : ?>
-                            <?php if ( ! empty( $group->name ) ) : ?>
-                                <h3 class="pxr-custom-single__group-title pxr:text-sm pxr:font-semibold pxr:uppercase pxr:tracking-wide pxr:mt-4 pxr:mb-2 pxr:opacity-70">
-                                    <?php echo esc_html( $group->name ); ?>
-                                </h3>
-                            <?php endif; ?>
-                            <?php if ( ! empty( $group->items ) && is_array( $group->items ) ) : ?>
-                                <ul class="pxr-custom-single__ingredient-list pxr:list-none pxr:p-0 pxr:m-0 pxr:space-y-2" role="list">
-                                    <?php foreach ( $group->items as $ingredient ) : ?>
-                                        <li class="pxr-custom-single__ingredient pxr:flex pxr:items-start pxr:gap-2">
-                                            <label class="pxr:flex pxr:items-start pxr:gap-2 pxr:cursor-pointer pxr:w-full">
-                                                <input type="checkbox"
-                                                       class="pxr-custom-checkbox pxr:mt-1 pxr:flex-shrink-0 pxr:w-4 pxr:h-4 pxr:rounded pxr:border"
-                                                       data-pxr-ingredient-check
-                                                       aria-label="<?php echo esc_attr( $ingredient->text ?? '' ); ?>" />
-                                                <span class="pxr-custom-single__ingredient-text pxr:text-sm pxr:leading-relaxed"
-                                                      itemprop="recipeIngredient"
-                                                      data-pxr-amount="<?php echo esc_attr( $ingredient->amount ?? '' ); ?>"
-                                                      data-pxr-unit="<?php echo esc_attr( $ingredient->unit ?? '' ); ?>">
-                                                    <?php if ( ! empty( $ingredient->amount ) ) : ?>
-                                                        <strong class="pxr-custom-single__ingredient-amount" data-pxr-ingredient-amount>
-                                                            <?php echo esc_html( $ingredient->amount ); ?>
-                                                        </strong>
-                                                    <?php endif; ?>
-                                                    <?php if ( ! empty( $ingredient->unit ) ) : ?>
-                                                        <span class="pxr-custom-single__ingredient-unit" data-pxr-ingredient-unit>
-                                                            <?php echo esc_html( $ingredient->unit ); ?>
-                                                        </span>
-                                                    <?php endif; ?>
-                                                    <?php echo esc_html( $ingredient->name ?? $ingredient->text ?? '' ); ?>
-                                                    <?php if ( ! empty( $ingredient->notes ) ) : ?>
-                                                        <em class="pxr:opacity-60">(<?php echo esc_html( $ingredient->notes ); ?>)</em>
-                                                    <?php endif; ?>
-                                                </span>
-                                            </label>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            <?php endif; ?>
+            <?php
+            $ingredients_block_class = 'pxr:mb-6';
+            include plugixa_recipe_template( 'single/ingredients.php' );
+            ?>
         <?php endif; ?>
     </header>
 
@@ -804,11 +728,22 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                     <?php esc_html_e( 'Instructions', 'plugixa-recipe' ); ?>
                 </h2>
                 <?php
+                /**
+                 * Fires under the Instructions heading of a single recipe: cook mode.
+                 *
+                 * @since 1.2.0
+                 *
+                 * @param object $recipe    The presented recipe.
+                 * @param string $unique_id The page's id prefix.
+                 */
+                do_action( 'plugixa_recipe_single_method_tools', $recipe, $unique_id );
+                ?>
+                <?php
                 $step_counter = 0;
                 foreach ( $instruction_groups as $group ) :
                 ?>
                     <?php if ( ! empty( $group->name ) ) : ?>
-                        <h3 class="pxr-custom-single__group-title pxr:text-lg pxr:font-semibold pxr:mt-6 pxr:mb-4">
+                        <h3 class="pxr-custom-single__group-title pxr:text-lg pxr:font-semibold pxr:mt-6 pxr:mb-4" data-pxr-step-group>
                             <?php echo esc_html( $group->name ); ?>
                         </h3>
                     <?php endif; ?>
@@ -817,17 +752,26 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                             <?php foreach ( $group->steps as $step ) :
                                 $step_counter++;
                             ?>
-                                <li class="pxr-custom-single__step pxr:flex pxr:gap-4"
-                                    itemprop="recipeInstructions"
-                                    itemscope
-                                    itemtype="https://schema.org/HowToStep">
+                                <li class="pxr-custom-single__step pxr:flex pxr:gap-4" data-pxr-step="<?php echo esc_attr( $step_counter ); ?>">
                                     <span class="pxr-custom-single__step-number pxr:flex-shrink-0 pxr:w-8 pxr:h-8 pxr:rounded-full pxr:flex pxr:items-center pxr:justify-center pxr:font-bold pxr:text-sm"
                                           aria-hidden="true">
                                         <?php echo esc_html( $step_counter ); ?>
                                     </span>
                                     <div class="pxr-custom-single__step-content pxr:flex-grow">
-                                        <meta itemprop="position" content="<?php echo esc_attr( $step_counter ); ?>" />
-                                        <div class="pxr-custom-single__step-text pxr:leading-relaxed" itemprop="text">
+                                        <?php if ( ! empty( $step->title ) || ! empty( $step->timer_label ) ) : ?>
+                                            <div class="pxr-custom-single__step-head pxr:flex pxr:flex-wrap pxr:items-center pxr:gap-2 pxr:mb-1">
+                                                <?php if ( ! empty( $step->title ) ) : ?>
+                                                    <strong class="pxr-custom-single__step-title"><?php echo esc_html( $step->title ); ?></strong>
+                                                <?php endif; ?>
+                                                <?php if ( ! empty( $step->timer_label ) ) : ?>
+                                                    <span class="pxr-custom-single__step-time pxr:text-xs pxr:px-2 pxr:py-1 pxr:rounded-full pxr:border"
+                                                          data-pxr-timer-seconds="<?php echo esc_attr( $step->timer_seconds ); ?>">
+                                                        <?php echo esc_html( $step->timer_label ); ?>
+                                                    </span>
+                                                <?php endif; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <div class="pxr-custom-single__step-text pxr:leading-relaxed" data-pxr-step-text>
                                             <?php echo wp_kses_post( $step->text ?? '' ); ?>
                                         </div>
                                         <?php if ( ! empty( $step->image_url ) ) : ?>
@@ -838,9 +782,18 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                                                          echo esc_attr( sprintf( __( 'Step %d', 'plugixa-recipe' ), $step_counter ) );
                                                      ?>"
                                                      class="pxr:w-full pxr:h-auto pxr:rounded-lg"
-                                                     loading="lazy"
-                                                     itemprop="image" />
+                                                     loading="lazy" />
                                             </div>
+                                        <?php endif; ?>
+                                        <?php if ( ! empty( $step->video_url ) ) : ?>
+                                            <p class="pxr-custom-single__step-video pxr:mt-2 pxr:mb-0 pxr:text-sm">
+                                                <a href="<?php echo esc_url( $step->video_url ); ?>" rel="noopener" target="_blank">
+                                                    <?php
+                                                    /* translators: %d: step number */
+                                                    echo esc_html( sprintf( __( 'Watch step %d', 'plugixa-recipe' ), $step_counter ) );
+                                                    ?>
+                                                </a>
+                                            </p>
                                         <?php endif; ?>
                                         <?php if ( ! empty( $step->tip ) ) : ?>
                                             <div class="pxr-custom-single__step-tip pxr:mt-2 pxr:py-2 pxr:px-3 pxr:rounded-md pxr:text-sm pxr:border-l-4"
@@ -859,6 +812,21 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
         </section>
     <?php endif; ?>
 
+    <?php include plugixa_recipe_template( 'single/extras.php' ); ?>
+
+    <?php
+    /**
+     * Fires inside a single recipe, after its method: markup the reader tools need once
+     * (the cook-mode dialog, the timer dock).
+     *
+     * @since 1.2.0
+     *
+     * @param object $recipe    The presented recipe.
+     * @param string $unique_id The page's id prefix.
+     */
+    do_action( 'plugixa_recipe_single_tools', $recipe, $unique_id );
+    ?>
+
     <!-- Video Section -->
     <?php if ( $show_video && $video_embed ) : ?>
         <section class="pxr-custom-single__video pxr:mb-8"
@@ -867,12 +835,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                 class="pxr-custom-single__section-title pxr:text-xl pxr:font-bold pxr:mb-4 pxr:pb-2 pxr:border-b">
                 <?php esc_html_e( 'Video', 'plugixa-recipe' ); ?>
             </h2>
-            <div class="pxr-custom-single__video-wrapper pxr:rounded-xl pxr:overflow-hidden"
-                 itemprop="video"
-                 itemscope
-                 itemtype="https://schema.org/VideoObject">
-                <meta itemprop="contentUrl" content="<?php echo esc_attr( $video_url ); ?>" />
-                <meta itemprop="name" content="<?php echo esc_attr( $recipe_title ); ?>" />
+            <div class="pxr-custom-single__video-wrapper pxr:rounded-xl pxr:overflow-hidden">
                 <div class="pxr-custom-single__video-embed">
                     <?php
                     // oEmbed player markup (YouTube / Vimeo <iframe>), late-escaped through
@@ -902,8 +865,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                         <img src="<?php echo esc_url( $img->url ); ?>"
                              alt="<?php echo esc_attr( $img->alt ); ?>"
                              class="pxr-custom-single__gallery-img"
-                             loading="lazy"
-                             itemprop="image" />
+                             loading="lazy" />
                         <div class="pxr-custom-single__gallery-overlay" aria-hidden="true">
                             <svg class="pxr:w-6 pxr:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/>
@@ -1018,21 +980,19 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
             <?php endif; ?>
 
             <!-- Footer Row: Diet Badges + Social Share -->
-            <div class="pxr-custom-single__rating-footer pxr:flex pxr:flex-wrap pxr:items-center pxr:justify-between pxr:gap-4 pxr:px-6 pxr:py-4 pxr:border-t" style="border-color: var(--pxr-border-color, #e5e7eb);">
+            <div class="pxr-custom-single__rating-footer pxr:flex pxr:flex-wrap pxr:items-center pxr:justify-between pxr:gap-4 pxr:px-6 pxr:py-4 pxr:border-t pxr:min-w-0 pxr:max-w-full">
                 <!-- Diet Badges (left) -->
-                <div class="pxr-custom-single__rating-footer-tags pxr:flex pxr:flex-wrap pxr:gap-2">
+                <div class="pxr-custom-single__rating-footer-tags pxr:flex pxr:flex-wrap pxr:gap-2 pxr:min-w-0 pxr:max-w-full">
                     <?php if ( ! empty( $diet_badges ) ) : ?>
                         <?php foreach ( $diet_badges as $badge ) : ?>
-                            <span class="pxr-custom-badge pxr-custom-badge--diet pxr:text-sm pxr:px-3 pxr:py-1 pxr:rounded-full pxr:font-medium"
-                                  itemprop="suitableForDiet"
-                                  content="https://schema.org/<?php echo esc_attr( str_replace( ' ', '', $badge ) ); ?>Diet">
+                            <span class="pxr-custom-badge pxr-custom-badge--diet pxr:text-sm pxr:px-3 pxr:py-1 pxr:rounded-full pxr:font-medium">
                                 <?php echo esc_html( $badge ); ?>
                             </span>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
                 <!-- Social Share Icons (right) -->
-                <div class="pxr-custom-single__rating-social pxr:flex pxr:items-center pxr:gap-2">
+                <div class="pxr-custom-single__rating-social pxr:flex pxr:flex-wrap pxr:items-center pxr:gap-2 pxr:max-w-full">
                     <!-- Facebook -->
                     <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo rawurlencode( $share_url ); ?>"
                        class="pxr-custom-single__rating-social-link"
@@ -1128,8 +1088,6 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                         $helpful_count = (int) ( $review->helpful_count ?? 0 );
                     ?>
                         <div class="pxr-custom-review pxr:p-4 pxr:rounded-lg pxr:border"
-                             itemscope
-                             itemtype="https://schema.org/Review"
                              data-review-id="<?php echo esc_attr( $review->id ); ?>">
                             <div class="pxr-custom-review__header pxr:flex pxr:items-center pxr:justify-between pxr:mb-2">
                                 <div class="pxr:flex pxr:items-center pxr:gap-3">
@@ -1138,22 +1096,18 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                                         <?php echo esc_html( $initials ); ?>
                                     </div>
                                     <div>
-                                        <span class="pxr-custom-review__author pxr:font-semibold pxr:text-sm pxr:block" itemprop="author">
+                                        <span class="pxr-custom-review__author pxr:font-semibold pxr:text-sm pxr:block">
                                             <?php echo esc_html( $review_name ); ?>
                                         </span>
                                         <?php if ( ! empty( $review->created_at ) ) : ?>
-                                            <time class="pxr-custom-review__date pxr:text-xs pxr:opacity-60" itemprop="datePublished" datetime="<?php echo esc_attr( $review->created_at ); ?>">
+                                            <time class="pxr-custom-review__date pxr:text-xs pxr:opacity-60" datetime="<?php echo esc_attr( $review->created_at ); ?>">
                                                 <?php echo esc_html( date_i18n( get_option( 'date_format' ), strtotime( $review->created_at ) ) ); ?>
                                             </time>
                                         <?php endif; ?>
                                     </div>
                                 </div>
                                 <?php if ( ! empty( $review->rating ) ) : ?>
-                                    <div class="pxr-custom-review__rating pxr:flex pxr:gap-0.5"
-                                         itemprop="reviewRating"
-                                         itemscope
-                                         itemtype="https://schema.org/Rating">
-                                        <meta itemprop="ratingValue" content="<?php echo esc_attr( $review->rating ); ?>" />
+                                    <div class="pxr-custom-review__rating pxr:flex pxr:gap-0.5">
                                         <?php for ( $i = 1; $i <= 5; $i++ ) : ?>
                                             <svg class="pxr-custom-star <?php echo $i <= $review->rating ? 'pxr-custom-star--full' : 'pxr-custom-star--empty'; ?> pxr:w-3.5 pxr:h-3.5"
                                                  viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -1164,7 +1118,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                                 <?php endif; ?>
                             </div>
                             <?php if ( ! empty( $review->review_text ) ) : ?>
-                                <div class="pxr-custom-review__text pxr:text-sm pxr:leading-relaxed" itemprop="reviewBody">
+                                <div class="pxr-custom-review__text pxr:text-sm pxr:leading-relaxed">
                                     <?php echo wp_kses_post( $review->review_text ); ?>
                                 </div>
                             <?php endif; ?>

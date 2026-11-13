@@ -30,7 +30,10 @@ $image_url    = isset( $recipe->image_url ) ? $recipe->image_url : '';
 $rating       = isset( $recipe->rating ) ? floatval( $recipe->rating ) : 0;
 $prep_time    = isset( $recipe->prep_time ) ? absint( $recipe->prep_time ) : 0;
 $cook_time    = isset( $recipe->cook_time ) ? absint( $recipe->cook_time ) : 0;
-$total_time   = $prep_time + $cook_time;
+// The stored column counts rest time too; the sum is for a caller that did not select it.
+$total_time   = isset( $recipe->total_time )
+    ? absint( $recipe->total_time )
+    : $prep_time + $cook_time + ( isset( $recipe->rest_time ) ? absint( $recipe->rest_time ) : 0 );
 $difficulty   = isset( $recipe->difficulty ) ? $recipe->difficulty : '';
 $categories   = isset( $recipe->categories ) && is_array( $recipe->categories ) ? $recipe->categories : [];
 

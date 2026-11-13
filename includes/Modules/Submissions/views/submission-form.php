@@ -24,7 +24,7 @@
  * @var array  $difficulty_options  [value => label]
  * @var array  $cost_options        [value => label]
  * @var array  $season_options      [value => label]
- * @var array  $unit_options        [value => label]
+ * @var array  $unit_options        [{value, name}, ...] the site's units
  * @var array  $settings            Plugin settings
  *
  * @package PlugixaRecipe
@@ -78,6 +78,15 @@ $select_classes = 'pxr-custom-form-input pxr-custom-form-select';
 
     <!-- Messages -->
     <div class="pxr-custom-form-message pxr:hidden" data-pxr-form-message role="alert" aria-live="polite"></div>
+
+    <?php // Unsaved text kept in this browser from an earlier visit; filled in and shown by the form's script. ?>
+    <div class="pxr-custom-form-draft" data-pxr-draft-notice hidden>
+        <span data-pxr-draft-text><?php esc_html_e( 'You started a recipe here earlier. Its text was kept in this browser.', 'plugixa-recipe' ); ?></span>
+        <span class="pxr-custom-form-draft__actions">
+            <button type="button" class="pxr-custom-form-add-btn" data-pxr-draft-restore><?php esc_html_e( 'Restore it', 'plugixa-recipe' ); ?></button>
+            <button type="button" class="pxr-custom-form-add-btn pxr-custom-form-add-btn--quiet" data-pxr-draft-discard><?php esc_html_e( 'Discard', 'plugixa-recipe' ); ?></button>
+        </span>
+    </div>
 
     <!-- Header -->
     <div class="pxr-custom-form-header">
@@ -380,29 +389,98 @@ $select_classes = 'pxr-custom-form-input pxr-custom-form-select';
         <div class="pxr-custom-form-panel" data-pxr-panel="ingredients" role="tabpanel">
             <div class="pxr-custom-form-section__fields">
                 <div class="pxr-custom-form-card">
-                    <div class="pxr-custom-form-rows" data-pxr-ingredient-rows>
-                        <div class="pxr-custom-ingredient-row" data-pxr-ingredient-row>
-                            <input type="number" name="ing_qty[]" step="any" min="0" placeholder="<?php esc_attr_e( 'Qty', 'plugixa-recipe' ); ?>"
-                                   class="<?php echo esc_attr( $input_classes ); ?> pxr-custom-ingredient-row__qty" />
-                            <select name="ing_unit[]" class="<?php echo esc_attr( $select_classes ); ?> pxr-custom-ingredient-row__unit">
-                                <?php foreach ( $unit_options as $uval => $ulbl ) : ?>
-                                    <option value="<?php echo esc_attr( $uval ); ?>"><?php echo esc_html( $ulbl ); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                            <input type="text" name="ing_name[]" placeholder="<?php esc_attr_e( 'Ingredient name', 'plugixa-recipe' ); ?>" required
-                                   class="<?php echo esc_attr( $input_classes ); ?> pxr-custom-ingredient-row__name" />
-                            <input type="text" name="ing_notes[]" placeholder="<?php esc_attr_e( 'Notes', 'plugixa-recipe' ); ?>"
-                                   class="<?php echo esc_attr( $input_classes ); ?> pxr-custom-ingredient-row__notes" />
-                            <button type="button" class="pxr-custom-remove-row" data-pxr-remove-ingredient
-                                    aria-label="<?php esc_attr_e( 'Remove ingredient', 'plugixa-recipe' ); ?>" disabled>
-                                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4"/></svg>
-                            </button>
+                    <p class="pxr-custom-form-helper pxr-custom-form-helper--top"><?php esc_html_e( 'Add ingredients one at a time, or paste a whole list. Drag a row by its handle to reorder it.', 'plugixa-recipe' ); ?></p>
+
+                    <?php // The rows are made by the form's script from the two templates below, so a list can be reordered, grouped and pasted into. ?>
+                    <div class="pxr-custom-form-rows" data-pxr-ingredient-rows></div>
+
+                    <div class="pxr-custom-form-row-actions">
+                        <button type="button" class="pxr-custom-form-add-btn" data-pxr-add-ingredient>
+                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                            <?php esc_html_e( 'Add Ingredient', 'plugixa-recipe' ); ?>
+                        </button>
+                        <button type="button" class="pxr-custom-form-add-btn" data-pxr-add-heading="ingredients">
+                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                            <?php esc_html_e( 'Add group heading', 'plugixa-recipe' ); ?>
+                        </button>
+                        <button type="button" class="pxr-custom-form-add-btn pxr-custom-form-add-btn--quiet" data-pxr-paste-toggle="ingredients" aria-expanded="false">
+                            <?php esc_html_e( 'Paste a list', 'plugixa-recipe' ); ?>
+                        </button>
+                    </div>
+
+                    <div class="pxr-custom-paste-panel" data-pxr-paste-panel="ingredients" hidden>
+                        <label for="<?php echo esc_attr( $form_id ); ?>-paste-ingredients" class="<?php echo esc_attr( $label_classes ); ?>"><?php esc_html_e( 'Paste your ingredient list', 'plugixa-recipe' ); ?></label>
+                        <textarea id="<?php echo esc_attr( $form_id ); ?>-paste-ingredients" rows="6" data-pxr-paste-text
+                                  placeholder="<?php echo esc_attr( __( "2 cups flour, sifted\n1 tsp salt\nFor the sauce:\n3 tbsp butter", 'plugixa-recipe' ) ); ?>"
+                                  class="<?php echo esc_attr( $input_classes ); ?>"></textarea>
+                        <p class="pxr-custom-form-helper"><?php esc_html_e( 'One ingredient per line. A line that ends with a colon becomes a group heading. Everything stays editable after it is added.', 'plugixa-recipe' ); ?></p>
+                        <div class="pxr-custom-form-row-actions">
+                            <button type="button" class="pxr-custom-form-add-btn" data-pxr-paste-apply><?php esc_html_e( 'Add to the list', 'plugixa-recipe' ); ?></button>
+                            <button type="button" class="pxr-custom-form-add-btn pxr-custom-form-add-btn--quiet" data-pxr-paste-cancel><?php esc_html_e( 'Cancel', 'plugixa-recipe' ); ?></button>
                         </div>
                     </div>
-                    <button type="button" class="pxr-custom-form-add-btn" data-pxr-add-ingredient>
-                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-                        <?php esc_html_e( 'Add Ingredient', 'plugixa-recipe' ); ?>
-                    </button>
+
+                    <?php // The site's own units, offered as the visitor types. Free text is still accepted: this suggests, it does not restrict. ?>
+                    <datalist id="<?php echo esc_attr( $form_id ); ?>-units">
+                        <?php foreach ( $unit_options as $unit_option ) : ?>
+                            <option value="<?php echo esc_attr( $unit_option['value'] ); ?>" label="<?php echo esc_attr( $unit_option['name'] ); ?>"></option>
+                        <?php endforeach; ?>
+                    </datalist>
+
+                    <template data-pxr-ingredient-template>
+                        <div class="pxr-custom-ingredient-row" data-pxr-row data-pxr-ingredient-row>
+                            <button type="button" class="pxr-custom-row-handle" data-pxr-handle
+                                    aria-label="<?php esc_attr_e( 'Reorder: drag, or press the up and down arrow keys', 'plugixa-recipe' ); ?>">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>
+                            </button>
+                            <input type="text" name="ing_qty[]" inputmode="decimal" maxlength="50"
+                                   placeholder="<?php esc_attr_e( 'Qty', 'plugixa-recipe' ); ?>" aria-label="<?php esc_attr_e( 'Quantity', 'plugixa-recipe' ); ?>"
+                                   class="<?php echo esc_attr( $input_classes ); ?> pxr-custom-ingredient-row__qty" />
+                            <input type="text" name="ing_unit[]" maxlength="50" autocomplete="off" list="<?php echo esc_attr( $form_id ); ?>-units"
+                                   placeholder="<?php esc_attr_e( 'Unit', 'plugixa-recipe' ); ?>" aria-label="<?php esc_attr_e( 'Unit', 'plugixa-recipe' ); ?>"
+                                   class="<?php echo esc_attr( $input_classes ); ?> pxr-custom-ingredient-row__unit" />
+                            <input type="text" name="ing_name[]" maxlength="500"
+                                   placeholder="<?php esc_attr_e( 'Ingredient name', 'plugixa-recipe' ); ?>" aria-label="<?php esc_attr_e( 'Ingredient name', 'plugixa-recipe' ); ?>"
+                                   class="<?php echo esc_attr( $input_classes ); ?> pxr-custom-ingredient-row__name" />
+                            <input type="text" name="ing_notes[]" maxlength="500"
+                                   placeholder="<?php esc_attr_e( 'Notes', 'plugixa-recipe' ); ?>" aria-label="<?php esc_attr_e( 'Notes', 'plugixa-recipe' ); ?>"
+                                   class="<?php echo esc_attr( $input_classes ); ?> pxr-custom-ingredient-row__notes" />
+                            <span class="pxr-custom-row-tools">
+                                <button type="button" class="pxr-custom-row-tool" data-pxr-move="-1" aria-label="<?php esc_attr_e( 'Move up', 'plugixa-recipe' ); ?>">
+                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
+                                </button>
+                                <button type="button" class="pxr-custom-row-tool" data-pxr-move="1" aria-label="<?php esc_attr_e( 'Move down', 'plugixa-recipe' ); ?>">
+                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                </button>
+                                <button type="button" class="pxr-custom-remove-row" data-pxr-remove-row aria-label="<?php esc_attr_e( 'Remove ingredient', 'plugixa-recipe' ); ?>">
+                                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4"/></svg>
+                                </button>
+                            </span>
+                        </div>
+                    </template>
+                    <template data-pxr-heading-template>
+                        <div class="pxr-custom-heading-row" data-pxr-row data-pxr-heading-row>
+                            <button type="button" class="pxr-custom-row-handle" data-pxr-handle
+                                    aria-label="<?php esc_attr_e( 'Reorder: drag, or press the up and down arrow keys', 'plugixa-recipe' ); ?>">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>
+                            </button>
+                            <input type="text" name="group_heading[]" maxlength="200"
+                                   placeholder="<?php esc_attr_e( 'Group heading, e.g. For the sauce', 'plugixa-recipe' ); ?>"
+                                   aria-label="<?php esc_attr_e( 'Group heading', 'plugixa-recipe' ); ?>"
+                                   class="<?php echo esc_attr( $input_classes ); ?> pxr-custom-heading-row__name" />
+                            <span class="pxr-custom-row-tools">
+                                <button type="button" class="pxr-custom-row-tool" data-pxr-move="-1" aria-label="<?php esc_attr_e( 'Move up', 'plugixa-recipe' ); ?>">
+                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
+                                </button>
+                                <button type="button" class="pxr-custom-row-tool" data-pxr-move="1" aria-label="<?php esc_attr_e( 'Move down', 'plugixa-recipe' ); ?>">
+                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                </button>
+                                <button type="button" class="pxr-custom-remove-row" data-pxr-remove-row aria-label="<?php esc_attr_e( 'Remove heading', 'plugixa-recipe' ); ?>">
+                                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4"/></svg>
+                                </button>
+                            </span>
+                        </div>
+                    </template>
                 </div>
             </div>
         </div>
@@ -413,26 +491,95 @@ $select_classes = 'pxr-custom-form-input pxr-custom-form-select';
         <div class="pxr-custom-form-panel" data-pxr-panel="instructions" role="tabpanel">
             <div class="pxr-custom-form-section__fields">
                 <div class="pxr-custom-form-card">
-                    <div class="pxr-custom-form-rows" data-pxr-instruction-rows>
-                        <div class="pxr-custom-instruction-row" data-pxr-instruction-row>
-                            <span class="pxr-custom-step-num" data-pxr-step-number>1</span>
-                            <div class="pxr-custom-instruction-row__fields">
-                                <input type="text" name="inst_titles[]" placeholder="<?php esc_attr_e( 'Step title (optional)', 'plugixa-recipe' ); ?>"
-                                       class="<?php echo esc_attr( $input_classes ); ?>" />
-                                <textarea name="instructions[]" rows="2" required
-                                          placeholder="<?php esc_attr_e( 'Describe this step...', 'plugixa-recipe' ); ?>"
-                                          class="<?php echo esc_attr( $input_classes ); ?>"></textarea>
-                            </div>
-                            <button type="button" class="pxr-custom-remove-row" data-pxr-remove-instruction
-                                    aria-label="<?php esc_attr_e( 'Remove instruction', 'plugixa-recipe' ); ?>" disabled>
-                                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4"/></svg>
-                            </button>
+                    <div class="pxr-custom-form-rows" data-pxr-instruction-rows></div>
+
+                    <div class="pxr-custom-form-row-actions">
+                        <button type="button" class="pxr-custom-form-add-btn" data-pxr-add-instruction>
+                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                            <?php esc_html_e( 'Add Step', 'plugixa-recipe' ); ?>
+                        </button>
+                        <button type="button" class="pxr-custom-form-add-btn" data-pxr-add-heading="instructions">
+                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                            <?php esc_html_e( 'Add group heading', 'plugixa-recipe' ); ?>
+                        </button>
+                        <button type="button" class="pxr-custom-form-add-btn pxr-custom-form-add-btn--quiet" data-pxr-paste-toggle="instructions" aria-expanded="false">
+                            <?php esc_html_e( 'Paste the steps', 'plugixa-recipe' ); ?>
+                        </button>
+                    </div>
+
+                    <div class="pxr-custom-paste-panel" data-pxr-paste-panel="instructions" hidden>
+                        <label for="<?php echo esc_attr( $form_id ); ?>-paste-instructions" class="<?php echo esc_attr( $label_classes ); ?>"><?php esc_html_e( 'Paste your steps', 'plugixa-recipe' ); ?></label>
+                        <textarea id="<?php echo esc_attr( $form_id ); ?>-paste-instructions" rows="6" data-pxr-paste-text
+                                  placeholder="<?php echo esc_attr( __( "1. Heat the oven.\n2. Mix the dry ingredients.", 'plugixa-recipe' ) ); ?>"
+                                  class="<?php echo esc_attr( $input_classes ); ?>"></textarea>
+                        <p class="pxr-custom-form-helper"><?php esc_html_e( 'One step per line, or leave a blank line between steps. Numbers in front are removed.', 'plugixa-recipe' ); ?></p>
+                        <div class="pxr-custom-form-row-actions">
+                            <button type="button" class="pxr-custom-form-add-btn" data-pxr-paste-apply><?php esc_html_e( 'Add to the list', 'plugixa-recipe' ); ?></button>
+                            <button type="button" class="pxr-custom-form-add-btn pxr-custom-form-add-btn--quiet" data-pxr-paste-cancel><?php esc_html_e( 'Cancel', 'plugixa-recipe' ); ?></button>
                         </div>
                     </div>
-                    <button type="button" class="pxr-custom-form-add-btn" data-pxr-add-instruction>
-                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-                        <?php esc_html_e( 'Add Step', 'plugixa-recipe' ); ?>
-                    </button>
+
+                    <template data-pxr-instruction-template>
+                        <div class="pxr-custom-instruction-row" data-pxr-row data-pxr-instruction-row>
+                            <button type="button" class="pxr-custom-row-handle" data-pxr-handle
+                                    aria-label="<?php esc_attr_e( 'Reorder: drag, or press the up and down arrow keys', 'plugixa-recipe' ); ?>">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>
+                            </button>
+                            <span class="pxr-custom-step-num" data-pxr-step-number>1</span>
+                            <div class="pxr-custom-instruction-row__fields">
+                                <input type="text" name="inst_titles[]" maxlength="500"
+                                       placeholder="<?php esc_attr_e( 'Step title (optional)', 'plugixa-recipe' ); ?>" aria-label="<?php esc_attr_e( 'Step title', 'plugixa-recipe' ); ?>"
+                                       class="<?php echo esc_attr( $input_classes ); ?>" />
+                                <textarea name="instructions[]" rows="2"
+                                          placeholder="<?php esc_attr_e( 'Describe this step...', 'plugixa-recipe' ); ?>" aria-label="<?php esc_attr_e( 'What to do in this step', 'plugixa-recipe' ); ?>"
+                                          class="<?php echo esc_attr( $input_classes ); ?>"></textarea>
+                                <div class="pxr-custom-instruction-row__extras">
+                                    <input type="text" name="inst_timers[]" maxlength="20" autocomplete="off"
+                                           placeholder="<?php esc_attr_e( 'Timer: 12, 1:30 or 90s', 'plugixa-recipe' ); ?>" aria-label="<?php esc_attr_e( 'Timer, in minutes or as 1:30 or 90s', 'plugixa-recipe' ); ?>"
+                                           class="<?php echo esc_attr( $input_classes ); ?> pxr-custom-instruction-row__timer" />
+                                    <label class="pxr-custom-step-photo">
+                                        <input type="file" accept="image/jpeg,image/png,image/webp" class="pxr:sr-only" data-pxr-step-photo />
+                                        <span data-pxr-step-photo-label><?php esc_html_e( 'Add a photo', 'plugixa-recipe' ); ?></span>
+                                    </label>
+                                    <button type="button" class="pxr-custom-step-photo__remove" data-pxr-step-photo-remove hidden><?php esc_html_e( 'Remove photo', 'plugixa-recipe' ); ?></button>
+                                </div>
+                            </div>
+                            <span class="pxr-custom-row-tools">
+                                <button type="button" class="pxr-custom-row-tool" data-pxr-move="-1" aria-label="<?php esc_attr_e( 'Move up', 'plugixa-recipe' ); ?>">
+                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
+                                </button>
+                                <button type="button" class="pxr-custom-row-tool" data-pxr-move="1" aria-label="<?php esc_attr_e( 'Move down', 'plugixa-recipe' ); ?>">
+                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                </button>
+                                <button type="button" class="pxr-custom-remove-row" data-pxr-remove-row aria-label="<?php esc_attr_e( 'Remove step', 'plugixa-recipe' ); ?>">
+                                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4"/></svg>
+                                </button>
+                            </span>
+                        </div>
+                    </template>
+                    <template data-pxr-heading-template>
+                        <div class="pxr-custom-heading-row" data-pxr-row data-pxr-heading-row>
+                            <button type="button" class="pxr-custom-row-handle" data-pxr-handle
+                                    aria-label="<?php esc_attr_e( 'Reorder: drag, or press the up and down arrow keys', 'plugixa-recipe' ); ?>">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>
+                            </button>
+                            <input type="text" name="group_heading[]" maxlength="200"
+                                   placeholder="<?php esc_attr_e( 'Group heading, e.g. For the sauce', 'plugixa-recipe' ); ?>"
+                                   aria-label="<?php esc_attr_e( 'Group heading', 'plugixa-recipe' ); ?>"
+                                   class="<?php echo esc_attr( $input_classes ); ?> pxr-custom-heading-row__name" />
+                            <span class="pxr-custom-row-tools">
+                                <button type="button" class="pxr-custom-row-tool" data-pxr-move="-1" aria-label="<?php esc_attr_e( 'Move up', 'plugixa-recipe' ); ?>">
+                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
+                                </button>
+                                <button type="button" class="pxr-custom-row-tool" data-pxr-move="1" aria-label="<?php esc_attr_e( 'Move down', 'plugixa-recipe' ); ?>">
+                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                </button>
+                                <button type="button" class="pxr-custom-remove-row" data-pxr-remove-row aria-label="<?php esc_attr_e( 'Remove heading', 'plugixa-recipe' ); ?>">
+                                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4"/></svg>
+                                </button>
+                            </span>
+                        </div>
+                    </template>
                 </div>
             </div>
         </div>
@@ -442,7 +589,7 @@ $select_classes = 'pxr-custom-form-input pxr-custom-form-select';
              ═══════════════════════════════════════════════════════════════ -->
         <div class="pxr-custom-form-panel" data-pxr-panel="nutrition" role="tabpanel">
             <div class="pxr-custom-form-section__fields">
-                <p class="pxr-custom-form-helper" style="margin-top:0"><?php esc_html_e( 'All nutrition fields are optional. Enter values per serving.', 'plugixa-recipe' ); ?></p>
+                <p class="pxr-custom-form-helper pxr-custom-form-helper--top"><?php esc_html_e( 'All nutrition fields are optional. Enter values per serving.', 'plugixa-recipe' ); ?></p>
 
                 <div>
                     <label for="<?php echo esc_attr( $form_id ); ?>-serving-size" class="<?php echo esc_attr( $label_classes ); ?>"><?php esc_html_e( 'Serving Size', 'plugixa-recipe' ); ?></label>
@@ -565,6 +712,10 @@ $select_classes = 'pxr-custom-form-input pxr-custom-form-select';
         <!-- ═══ ACTION BUTTONS ═══ -->
         <div class="pxr-custom-form-actions">
             <button type="reset" class="pxr-custom-form-actions__reset"><?php esc_html_e( 'Reset', 'plugixa-recipe' ); ?></button>
+            <span class="pxr-custom-form-actions__steps">
+                <button type="button" class="pxr-custom-form-actions__reset" data-pxr-step-back><?php esc_html_e( 'Back', 'plugixa-recipe' ); ?></button>
+                <button type="button" class="pxr-custom-form-actions__reset" data-pxr-step-next><?php esc_html_e( 'Next', 'plugixa-recipe' ); ?></button>
+            </span>
             <button type="submit" class="pxr-custom-submit-btn" data-pxr-submit-btn>
                 <span data-pxr-btn-text><?php esc_html_e( 'Submit Recipe', 'plugixa-recipe' ); ?></span>
                 <svg class="pxr:hidden pxr-custom-submit-spinner" data-pxr-btn-spinner viewBox="0 0 24 24" fill="none" aria-hidden="true">

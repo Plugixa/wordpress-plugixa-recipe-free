@@ -144,6 +144,29 @@ class Uninstaller {
     }
 
     /**
+     * Remove uploads/plugixa-recipe-imports and what is in it.
+     *
+     * The path is built from the uploads directory and a fixed name, and is checked to be
+     * inside it before anything is deleted.
+     */
+    private static function delete_import_staging(): void {
+        global $wp_filesystem;
+
+        $uploads = wp_upload_dir(null, false);
+        $base    = isset($uploads['basedir']) ? (string) $uploads['basedir'] : '';
+        $dir     = $base . '/plugixa-recipe-imports';
+
+        if ('' === $base || !is_dir($dir) || 0 !== strpos(wp_normalize_path($dir), trailingslashit(wp_normalize_path($base)))) {
+            return;
+        }
+
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        if (WP_Filesystem() && $wp_filesystem) {
+            $wp_filesystem->delete($dir, true);
+        }
+    }
+
+    /**
      * Drop tables, options, and capabilities on plugin delete.
      *
      * Honors the `delete_data_on_uninstall` setting: when disabled, plugin
@@ -232,6 +255,12 @@ class Uninstaller {
         foreach ( $leftovers as $table ) {
             $wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $table ) );
         }
+
+        // The one directory the plugin makes outside the media library: where an uploaded
+        // import file waits between the wizard's two steps. Like the premium tables above it
+        // is named here and not created here, so a site that went back to the free build
+        // is cleaned too. It survived "delete all data" until the October 2026 release E2E.
+        self::delete_import_staging();
 
         // Delete demo attachments from media library
         $demo_image_ids = get_option('plugixa_recipe_demo_image_ids', []);

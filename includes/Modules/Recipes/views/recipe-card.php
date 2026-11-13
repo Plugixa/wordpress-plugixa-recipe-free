@@ -33,7 +33,10 @@ $rating          = isset( $recipe->rating ) ? floatval( $recipe->rating ) : 0;
 $rating_count    = isset( $recipe->rating_count ) ? absint( $recipe->rating_count ) : 0;
 $prep_time       = isset( $recipe->prep_time ) ? absint( $recipe->prep_time ) : 0;
 $cook_time       = isset( $recipe->cook_time ) ? absint( $recipe->cook_time ) : 0;
-$total_time      = $prep_time + $cook_time;
+// The stored column counts rest time too; the sum is for a caller that did not select it.
+$total_time      = isset( $recipe->total_time )
+    ? absint( $recipe->total_time )
+    : $prep_time + $cook_time + ( isset( $recipe->rest_time ) ? absint( $recipe->rest_time ) : 0 );
 $servings        = isset( $recipe->servings ) ? absint( $recipe->servings ) : 0;
 $difficulty      = isset( $recipe->difficulty ) ? $recipe->difficulty : '';
 $cuisine         = isset( $recipe->cuisine ) ? $recipe->cuisine : '';
@@ -55,7 +58,7 @@ $has_video       = $video_enabled && $video_url && $video_type;
 // View config helpers
 $show_image      = isset( $view_config['show_image'] ) ? (bool) $view_config['show_image'] : true;
 $show_rating     = isset( $view_config['show_rating'] ) ? (bool) $view_config['show_rating'] : true;
-// Ratings are the Reviews module's data: with it off, no badge and no aggregateRating microdata.
+// Ratings are the Reviews module's data: with it off, no badge.
 $show_rating     = $show_rating && plugixa_recipe_app_enabled( 'reviews' );
 $show_meta       = isset( $view_config['show_meta'] ) ? (bool) $view_config['show_meta'] : true;
 $show_difficulty = isset( $view_config['show_difficulty'] ) ? (bool) $view_config['show_difficulty'] : true;
@@ -98,9 +101,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
 
 <article class="<?php echo esc_attr( $card_classes ); ?>"
          data-recipe-id="<?php echo esc_attr( $recipe_id ); ?>"
-         aria-label="<?php echo esc_attr( $recipe_title ); ?>"
-         itemscope
-         itemtype="https://schema.org/Recipe">
+         aria-label="<?php echo esc_attr( $recipe_title ); ?>">
 
     <?php if ( $show_image && $image_url ) : ?>
         <div class="pxr-custom-card__image-wrapper <?php echo $is_list ? 'pxr-custom-card__image-wrapper--list' : ''; ?>">
@@ -112,8 +113,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                 <img src="<?php echo esc_url( $image_url ); ?>"
                      alt="<?php echo esc_attr( $image_alt ); ?>"
                      class="pxr-custom-card__image pxr:w-full pxr:h-full pxr:object-cover pxr:transition-transform pxr:duration-300"
-                     <?php echo $plugixa_recipe_lazy ? 'loading="lazy"' : ''; ?>
-                     itemprop="image" />
+                     <?php echo $plugixa_recipe_lazy ? 'loading="lazy"' : ''; ?> />
 
                 <?php if ( $has_video && $video_type === 'self-hosted' ) : ?>
                     <div class="pxr-custom-card__video-container"
@@ -191,7 +191,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
             <div class="pxr-custom-card__content-top">
 
                 <!-- Title -->
-                <h3 class="pxr-custom-card__title pxr-custom-card__title--list pxr:m-0 pxr:leading-snug" itemprop="name">
+                <h3 class="pxr-custom-card__title pxr-custom-card__title--list pxr:m-0 pxr:leading-snug">
                     <a href="<?php echo esc_url( $permalink ); ?>"
                        class="pxr-custom-card__title-link pxr:no-underline pxr:transition-colors pxr:duration-200">
                         <?php echo esc_html( $recipe_title ); ?>
@@ -204,12 +204,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                          aria-label="<?php
                             /* translators: 1: average rating out of 5, 2: number of reviews. */
                             echo esc_attr( sprintf( __( 'Rated %1$s out of 5 from %2$s reviews', 'plugixa-recipe' ), number_format( $rating, 1 ), $rating_count ) );
-                         ?>"
-                         itemprop="aggregateRating"
-                         itemscope
-                         itemtype="https://schema.org/AggregateRating">
-                        <meta itemprop="ratingValue" content="<?php echo esc_attr( $rating ); ?>" />
-                        <meta itemprop="reviewCount" content="<?php echo esc_attr( $rating_count ); ?>" />
+                         ?>">
                         <div class="pxr-custom-card__stars pxr:flex pxr:gap-0.5">
                             <?php for ( $i = 1; $i <= 5; $i++ ) :
                                 $fill_class = 'pxr-custom-star--empty';
@@ -241,7 +236,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                                 <svg class="pxr:w-4 pxr:h-4 pxr:opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
-                                <span itemprop="prepTime" content="PT<?php echo esc_attr( $prep_time ); ?>M">
+                                <span>
                                     <?php echo esc_html( plugixa_recipe_format_time( $prep_time ) ); ?>
                                 </span>
                             </span>
@@ -258,7 +253,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"/>
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z"/>
                                 </svg>
-                                <span itemprop="cookTime" content="PT<?php echo esc_attr( $cook_time ); ?>M">
+                                <span>
                                     <?php echo esc_html( plugixa_recipe_format_time( $cook_time ) ); ?>
                                 </span>
                             </span>
@@ -274,7 +269,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                                 <svg class="pxr:w-4 pxr:h-4 pxr:opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                                 </svg>
-                                <span itemprop="recipeYield" content="<?php echo esc_attr( $servings ); ?>">
+                                <span>
                                     <?php
                                     /* translators: %d: number of servings. */
                                     echo esc_html( sprintf( _n( '%d serving', '%d servings', $servings, 'plugixa-recipe' ), $servings ) );
@@ -291,14 +286,13 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                             <svg class="pxr:w-3.5 pxr:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
-                            <span itemprop="recipeCuisine"><?php echo esc_html( $cuisine ); ?></span>
+                            <span><?php echo esc_html( $cuisine ); ?></span>
                         </span>
                     </div>
                 <?php endif; ?>
 
                 <?php if ( $show_excerpt && $excerpt ) : ?>
-                    <div class="pxr-custom-card__excerpt pxr-custom-card__excerpt--list"
-                         itemprop="description">
+                    <div class="pxr-custom-card__excerpt pxr-custom-card__excerpt--list">
                         <?php echo wp_kses_post( $excerpt ); ?>
                     </div>
                 <?php endif; ?>
@@ -310,9 +304,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                 <?php if ( $show_diet && ! empty( $diet_badges ) ) : ?>
                     <div class="pxr-custom-card__diets pxr:flex pxr:flex-wrap pxr:gap-1.5">
                         <?php foreach ( $diet_badges as $badge ) : ?>
-                            <span class="pxr-custom-badge pxr-custom-badge--diet pxr:text-xs pxr:px-2 pxr:py-0.5 pxr:rounded-full pxr:font-medium"
-                                  itemprop="suitableForDiet"
-                                  content="https://schema.org/<?php echo esc_attr( str_replace( ' ', '', $badge ) ); ?>Diet">
+                            <span class="pxr-custom-badge pxr-custom-badge--diet pxr:text-xs pxr:px-2 pxr:py-0.5 pxr:rounded-full pxr:font-medium">
                                 <?php echo esc_html( $badge ); ?>
                             </span>
                         <?php endforeach; ?>
@@ -331,7 +323,6 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
             </div>
 
             <?php if ( $total_time ) : ?>
-                <meta itemprop="totalTime" content="PT<?php echo esc_attr( $total_time ); ?>M" />
             <?php endif; ?>
 
         </div>
@@ -340,7 +331,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
         <!-- ═══ DEFAULT CONTENT (grid / masonry / slider) ═══ -->
         <div class="pxr-custom-card__content pxr:flex pxr:flex-col pxr:flex-grow pxr:p-4 pxr:gap-2">
 
-            <h3 class="pxr-custom-card__title pxr:m-0 pxr:leading-snug" itemprop="name">
+            <h3 class="pxr-custom-card__title pxr:m-0 pxr:leading-snug">
                 <a href="<?php echo esc_url( $permalink ); ?>"
                    class="pxr-custom-card__title-link pxr:no-underline pxr:transition-colors pxr:duration-200">
                     <?php echo esc_html( $recipe_title ); ?>
@@ -353,12 +344,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                      aria-label="<?php
                         /* translators: 1: average rating out of 5, 2: number of reviews. */
                         echo esc_attr( sprintf( __( 'Rated %1$s out of 5 from %2$s reviews', 'plugixa-recipe' ), number_format( $rating, 1 ), $rating_count ) );
-                     ?>"
-                     itemprop="aggregateRating"
-                     itemscope
-                     itemtype="https://schema.org/AggregateRating">
-                    <meta itemprop="ratingValue" content="<?php echo esc_attr( $rating ); ?>" />
-                    <meta itemprop="reviewCount" content="<?php echo esc_attr( $rating_count ); ?>" />
+                     ?>">
                     <div class="pxr-custom-card__stars pxr:flex pxr:gap-0.5">
                         <?php for ( $i = 1; $i <= 5; $i++ ) :
                             $fill_class = 'pxr-custom-star--empty';
@@ -390,7 +376,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                             <svg class="pxr:w-4 pxr:h-4 pxr:opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
-                            <span itemprop="prepTime" content="PT<?php echo esc_attr( $prep_time ); ?>M">
+                            <span>
                                 <?php echo esc_html( plugixa_recipe_format_time( $prep_time ) ); ?>
                             </span>
                         </span>
@@ -402,7 +388,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"/>
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z"/>
                             </svg>
-                            <span itemprop="cookTime" content="PT<?php echo esc_attr( $cook_time ); ?>M">
+                            <span>
                                 <?php echo esc_html( plugixa_recipe_format_time( $cook_time ) ); ?>
                             </span>
                         </span>
@@ -413,7 +399,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                             <svg class="pxr:w-4 pxr:h-4 pxr:opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                             </svg>
-                            <span itemprop="recipeYield" content="<?php echo esc_attr( $servings ); ?>">
+                            <span>
                                 <?php
                                 /* translators: %d: number of servings. */
                                 echo esc_html( sprintf( _n( '%d serving', '%d servings', $servings, 'plugixa-recipe' ), $servings ) );
@@ -427,9 +413,7 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
             <?php if ( $show_diet && ! empty( $diet_badges ) ) : ?>
                 <div class="pxr-custom-card__diets pxr:flex pxr:flex-wrap pxr:gap-1.5">
                     <?php foreach ( $diet_badges as $badge ) : ?>
-                        <span class="pxr-custom-badge pxr-custom-badge--diet pxr:text-xs pxr:px-2 pxr:py-0.5 pxr:rounded-full pxr:font-medium"
-                              itemprop="suitableForDiet"
-                              content="https://schema.org/<?php echo esc_attr( str_replace( ' ', '', $badge ) ); ?>Diet">
+                        <span class="pxr-custom-badge pxr-custom-badge--diet pxr:text-xs pxr:px-2 pxr:py-0.5 pxr:rounded-full pxr:font-medium">
                             <?php echo esc_html( $badge ); ?>
                         </span>
                     <?php endforeach; ?>
@@ -442,20 +426,18 @@ if ( ! function_exists( 'plugixa_recipe_format_time' ) ) {
                         <svg class="pxr:w-3.5 pxr:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        <span itemprop="recipeCuisine"><?php echo esc_html( $cuisine ); ?></span>
+                        <span><?php echo esc_html( $cuisine ); ?></span>
                     </span>
                 </div>
             <?php endif; ?>
 
             <?php if ( $show_excerpt && $excerpt ) : ?>
-                <div class="pxr-custom-card__excerpt pxr:text-sm pxr:leading-relaxed pxr:opacity-80 pxr:line-clamp-2"
-                     itemprop="description">
+                <div class="pxr-custom-card__excerpt pxr:text-sm pxr:leading-relaxed pxr:opacity-80 pxr:line-clamp-2">
                     <?php echo wp_kses_post( $excerpt ); ?>
                 </div>
             <?php endif; ?>
 
             <?php if ( $total_time ) : ?>
-                <meta itemprop="totalTime" content="PT<?php echo esc_attr( $total_time ); ?>M" />
             <?php endif; ?>
 
         </div>

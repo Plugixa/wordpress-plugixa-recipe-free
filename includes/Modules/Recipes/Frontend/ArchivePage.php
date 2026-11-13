@@ -283,25 +283,7 @@ class ArchivePage {
                 PLUGIXA_RECIPE_VERSION,
                 true
             );
-            wp_localize_script( 'plugixa-recipe-frontend', 'plugixaRecipeConfig', [
-                'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
-                'restUrl'    => esc_url_raw( rest_url( 'plugixa-recipe/v1/' ) ),
-                'nonce'      => wp_create_nonce( 'plugixa_recipe_frontend' ),
-                'restNonce'  => plugixa_recipe_rest_nonce(),
-                'isLoggedIn' => is_user_logged_in(),
-                'loginUrl'   => wp_login_url( get_permalink() ),
-                'i18n'       => [
-                    'tooltip' => [
-                        'like'       => __( 'Like this recipe', 'plugixa-recipe' ),
-                        'likeActive' => __( 'Unlike this recipe', 'plugixa-recipe' ),
-                        'save'       => __( 'Save to favorites', 'plugixa-recipe' ),
-                        'saveActive' => __( 'Remove from saved', 'plugixa-recipe' ),
-                        'loginLike'  => __( 'Log in to like this recipe', 'plugixa-recipe' ),
-                        'loginSave'  => __( 'Log in to save this recipe', 'plugixa-recipe' ),
-                        'loginLink'  => __( 'Log in', 'plugixa-recipe' ),
-                    ],
-                ],
-            ] );
+            \PlugixaRecipe\Core\Frontend\Assets::localize_config( plugixa_recipe_archive_url( $type, (string) $taxonomy->slug ) );
         }
 
         // Build archive base URL for pagination

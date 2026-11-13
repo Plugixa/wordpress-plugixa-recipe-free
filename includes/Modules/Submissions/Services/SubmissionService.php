@@ -6,6 +6,8 @@
 namespace PlugixaRecipe\Modules\Submissions\Services;
 
 use PlugixaRecipe\Core\Http\Failure;
+use PlugixaRecipe\Modules\Recipes\Enums;
+use PlugixaRecipe\Modules\Recipes\Services\ChildRows;
 use PlugixaRecipe\Modules\Submissions\Repositories\SubmissionRepository;
 use WP_Error;
 
@@ -230,17 +232,14 @@ final class SubmissionService {
 
         // Validate enums.
         $difficulty = sanitize_text_field($fields['difficulty']);
-        if (!in_array($difficulty, ['easy', 'medium', 'hard'], true)) {
+        if (!in_array($difficulty, Enums::DIFFICULTIES, true)) {
             $difficulty = 'medium';
         }
-        $cost = sanitize_text_field($fields['cost']);
-        if (!in_array($cost, ['budget', 'medium', 'expensive', ''], true)) {
-            $cost = '';
-        }
+        $cost = Enums::cost($fields['cost']);
 
         // Validate season enum.
         $season = sanitize_text_field($fields['season']);
-        if (!in_array($season, ['spring', 'summer', 'autumn', 'winter', 'all'], true)) {
+        if (!in_array($season, Enums::SEASONS, true)) {
             $season = 'all';
         }
 
@@ -304,7 +303,8 @@ final class SubmissionService {
             'season'         => $season,
             'video_url'      => esc_url_raw($fields['video_url']),
             'author_name'    => sanitize_text_field($fields['author_name']),
-            'source'         => sanitize_text_field($fields['source_name']) ?: 'form',
+            // The visitor's own credit, or nothing: this column is printed on the recipe.
+            'source'         => sanitize_text_field($fields['source_name']),
             'source_url'     => esc_url_raw($fields['source_url']),
             'tags'           => $tags_json,
             'equipment'      => $equip_json,
@@ -361,12 +361,85 @@ final class SubmissionService {
     }
 
     /**
+     * A submission's ingredients and instructions as table rows. Writes nothing.
+     *
+     * Each list arrives as JSON in a form field (or already decoded), every item either a
+     * bare string or a keyed array. A visitor may set: for an ingredient its name, quantity,
+     * unit, notes and group; for a step its text, title, group, timer, tip and - by naming
+     * the position of an uploaded file - its photo. Nothing else is read: no link_url, no
+     * image id, no video. A link in a submitted ingredient would be an anonymous visitor's
+     * URL on the site owner's page.
+     *
+     * @param mixed           $ingredients  JSON string or decoded list.
+     * @param mixed           $instructions JSON string or decoded list.
+     * @param array<int, int> $step_images  Attachment ids the controller stored, keyed by the
+     *                                      `image_index` a step names.
+     * @return array{ingredients: array<int, array<string, mixed>>, instructions: array<int, array<string, mixed>>}
+     */
+    public static function child_rows(int $recipe_id, $ingredients, $instructions, array $step_images = []): array {
+        $rows = ['ingredients' => [], 'instructions' => []];
+
+        $ingredients = is_string($ingredients) ? json_decode($ingredients, true) : $ingredients;
+        foreach (array_slice(is_array($ingredients) ? $ingredients : [], 0, 100) as $ing) {
+            // Sanitize BOTH shapes. The bare-string form used to skip the sanitizer
+            // entirely and reach the database insert raw, from a public anonymous endpoint -
+            // only the keyed-array form was cleaned.
+            $name = sanitize_text_field(self::scalar_string(is_string($ing) ? $ing : ($ing['name'] ?? '')));
+            if ('' === $name) {
+                continue;
+            }
+            $ing = is_array($ing) ? $ing : [];
+
+            $rows['ingredients'][] = ChildRows::ingredient($recipe_id, [
+                'name'        => $name,
+                'quantity'    => self::scalar_string($ing['quantity'] ?? ''),
+                'unit'        => self::scalar_string($ing['unit'] ?? ''),
+                'notes'       => self::scalar_string($ing['notes'] ?? ''),
+                'group_name'  => self::scalar_string($ing['group_name'] ?? ''),
+                'group_order' => max(0, min(99, (int) self::scalar_string($ing['group_order'] ?? 0))),
+                'sort_order'  => count($rows['ingredients']),
+            ]);
+        }
+
+        $instructions = is_string($instructions) ? json_decode($instructions, true) : $instructions;
+        foreach (array_slice(is_array($instructions) ? $instructions : [], 0, 50) as $inst) {
+            // 'text' is the alias the admin app binds its form to (the read path sets it
+            // from instruction_text), so accept either name rather than silently dropping
+            // an instruction that used the other one.
+            $text = self::scalar_string(is_string($inst) ? $inst : ($inst['instruction_text'] ?? $inst['text'] ?? ''));
+            if ('' === trim($text)) {
+                continue;
+            }
+            $inst = is_array($inst) ? $inst : [];
+
+            // A photo is one the controller just stored for THIS request, found by position.
+            $index = self::scalar_string($inst['image_index'] ?? '');
+            $image = ctype_digit($index) ? (int) ($step_images[(int) $index] ?? 0) : 0;
+
+            $rows['instructions'][] = ChildRows::instruction($recipe_id, [
+                'title'            => self::scalar_string($inst['title'] ?? ''),
+                'instruction_text' => $text,
+                'tip'              => self::scalar_string($inst['tip'] ?? ''),
+                // A day at most: a timer is for a step, and the column is unsigned.
+                'timer_seconds'    => max(0, min(86400, (int) self::scalar_string($inst['timer_seconds'] ?? 0))),
+                'image_id'         => $image > 0 ? $image : null,
+                'group_name'       => self::scalar_string($inst['group_name'] ?? ''),
+                'group_order'      => max(0, min(99, (int) self::scalar_string($inst['group_order'] ?? 0))),
+                'sort_order'       => count($rows['instructions']),
+            ]);
+        }
+
+        return $rows;
+    }
+
+    /**
      * Step 5 of a submission: the child rows, the action, the notification, and the cache.
      *
      * @param array<string, mixed> $submission What store() returned.
      * @param array<string, mixed> $fields     categories, cuisine_id, course_id, ingredients,
      *                                         instructions, nutrition - raw, as the controller
-     *                                         read them after the uploads.
+     *                                         read them after the uploads - and step_images,
+     *                                         the attachment ids it stored for step photos.
      * @param callable             $get_param  The controller's request reader, fn(string $key, $default).
      *                                         Not called here: it is the action's second argument.
      */
@@ -413,48 +486,13 @@ final class SubmissionService {
             }
         }
 
-        // Insert ingredients (structured: quantity + unit + name + notes, max 100).
-        $ingredients_json = $fields['ingredients'];
-        $ingredients      = is_string($ingredients_json) ? json_decode($ingredients_json, true) : $ingredients_json;
-        if (!empty($ingredients) && is_array($ingredients)) {
-            $ingredients = array_slice($ingredients, 0, 100);
-            foreach ($ingredients as $i => $ing) {
-                // Sanitize BOTH shapes. The bare-string form used to skip the sanitizer
-                // entirely and reach the database insert raw, from a public anonymous endpoint -
-                // only the keyed-array form was cleaned.
-                $name = sanitize_text_field(self::scalar_string(is_string($ing) ? $ing : ($ing['name'] ?? '')));
-                if (empty($name)) continue;
-                $this->submissions->add_ingredient([
-                    'recipe_id'   => $recipe_id,
-                    'name'        => $name,
-                    'quantity'    => sanitize_text_field(self::scalar_string($ing['quantity'] ?? '')),
-                    'unit'        => sanitize_text_field(self::scalar_string($ing['unit'] ?? '')),
-                    'notes'       => sanitize_text_field(self::scalar_string($ing['notes'] ?? '')),
-                    'sort_order'  => $i,
-                    'group_order' => 0,
-                ]);
-            }
+        // The ingredient and instruction rows (at most 100 and 50): see child_rows().
+        $rows = self::child_rows($recipe_id, $fields['ingredients'], $fields['instructions'], (array) ($fields['step_images'] ?? []));
+        foreach ($rows['ingredients'] as $row) {
+            $this->submissions->add_ingredient($row);
         }
-
-        // Insert instructions (with optional title, max 50).
-        $instructions_json = $fields['instructions'];
-        $instructions      = is_string($instructions_json) ? json_decode($instructions_json, true) : $instructions_json;
-        if (!empty($instructions) && is_array($instructions)) {
-            $instructions = array_slice($instructions, 0, 50);
-            foreach ($instructions as $i => $inst) {
-                // 'text' is the alias the admin app binds its form to (the read path sets it
-                // from instruction_text), so accept either name rather than silently dropping
-                // an instruction that used the other one.
-                $text = self::scalar_string(is_string($inst) ? $inst : ($inst['instruction_text'] ?? $inst['text'] ?? ''));
-                if (empty($text)) continue;
-                $this->submissions->add_instruction([
-                    'recipe_id'        => $recipe_id,
-                    'title'            => sanitize_text_field(self::scalar_string($inst['title'] ?? '')),
-                    'instruction_text' => wp_kses_post($text),
-                    'sort_order'       => $i,
-                    'group_order'      => 0,
-                ]);
-            }
+        foreach ($rows['instructions'] as $row) {
+            $this->submissions->add_instruction($row);
         }
 
         // Insert nutrition data (if any fields provided, with range clamping).

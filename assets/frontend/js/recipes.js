@@ -686,6 +686,12 @@
 
             function updateAmounts(newServings) {
                 var ratio = newServings / originalServings;
+                // With the reader tools on the page, recipe-tools.js writes the amounts
+                // (it also converts units): two writers would overwrite each other.
+                if (recipeRoot.hasAttribute('data-pxr-tools-active')) {
+                    recipeRoot.dispatchEvent(new CustomEvent('pxr:scale', { detail: { ratio: ratio } }));
+                    return;
+                }
                 originals.forEach(function (item) {
                     if (!item.amountEl || isNaN(item.parsed)) return;
                     var scaled = item.parsed * ratio;
@@ -806,7 +812,7 @@
                     var label = btn.querySelector('.pxr-custom-btn__label');
                     if (label) {
                         var origText = label.textContent;
-                        label.textContent = 'Please log in';
+                        label.textContent = ((plugixaRecipeConfig.i18n || {}).pleaseLogIn) || 'Please log in';
                         setTimeout(function () { label.textContent = origText; }, 2000);
                     }
                     return;
@@ -814,7 +820,9 @@
 
                 btn.disabled = true;
 
-                fetch(plugixaRecipeConfig.restUrl + 'favorites/' + recipeId, {
+                // The public route: any logged-in visitor may save. `favorites/{id}` is the
+                // admin one and refuses a subscriber.
+                fetch(plugixaRecipeConfig.restUrl + 'frontend/favorites/' + recipeId, {
                     method: 'POST',
                     headers: restHeaders({ 'Content-Type': 'application/json' }),
                     credentials: 'same-origin'
@@ -823,19 +831,23 @@
                 .then(function (result) {
                     if (result.success && result.data) {
                         var isFav = result.data.is_favorited;
-                        var svg = btn.querySelector('svg');
-                        var label = btn.querySelector('.pxr-custom-btn__label');
 
-                        btn.classList.toggle('pxr-custom-btn--favorited', isFav);
-                        btn.setAttribute('aria-pressed', isFav ? 'true' : 'false');
-                        btn.setAttribute('aria-label', isFav ? 'Remove from favorites' : 'Add to favorites');
+                        // The page carries the button twice (header and footer actions).
+                        document.querySelectorAll('[data-pxr-favorite="' + recipeId + '"]').forEach(function (b) {
+                            var svg = b.querySelector('svg');
+                            var label = b.querySelector('.pxr-custom-btn__label');
 
-                        if (svg) {
-                            svg.setAttribute('fill', isFav ? 'currentColor' : 'none');
-                        }
-                        if (label) {
-                            label.textContent = isFav ? 'Saved' : 'Save';
-                        }
+                            b.classList.toggle('pxr-custom-btn--favorited', isFav);
+                            b.setAttribute('aria-pressed', isFav ? 'true' : 'false');
+                            b.setAttribute('aria-label', isFav ? 'Remove from favorites' : 'Add to favorites');
+
+                            if (svg) {
+                                svg.setAttribute('fill', isFav ? 'currentColor' : 'none');
+                            }
+                            if (label) {
+                                label.textContent = isFav ? 'Saved' : 'Save';
+                            }
+                        });
                     }
                 })
                 .catch(function () {
@@ -865,6 +877,14 @@
     }
 
     /* ─── Review Helpful Votes ───────────────────── */
+    /** "Helpful" or "Helpful (3)", in the site's language. */
+    function helpfulLabel(count) {
+        var words = (typeof plugixaRecipeConfig !== 'undefined' && plugixaRecipeConfig.i18n) || {};
+        return count > 0
+            ? (words.helpfulCount || 'Helpful (%d)').replace('%d', String(count))
+            : (words.helpful || 'Helpful');
+    }
+
     function initReviewHelpful() {
         if (typeof plugixaRecipeConfig === 'undefined' || !plugixaRecipeConfig.reviewHelpfulEnabled) return;
 
@@ -889,7 +909,7 @@
                     var isActive = result.data.is_helpful;
                     var label = btn.querySelector('[data-pxr-helpful-label]');
                     if (label) {
-                        label.textContent = count > 0 ? 'Helpful (' + count + ')' : 'Helpful';
+                        label.textContent = helpfulLabel(count);
                     }
                     btn.setAttribute('data-helpful-count', count);
                     btn.classList.toggle('pxr-helpful-btn--active', isActive);
@@ -972,7 +992,7 @@
                             var helpfulHtml = '';
                             if (plugixaRecipeConfig.reviewHelpfulEnabled) {
                                 var hCount = review.helpful_count || 0;
-                                var hLabel = hCount > 0 ? 'Helpful (' + hCount + ')' : 'Helpful';
+                                var hLabel = helpfulLabel(hCount);
                                 helpfulHtml = '<div class="pxr-custom-review__actions pxr:flex pxr:items-center pxr:gap-3 pxr:mt-3">'
                                     + '<button type="button" class="pxr-helpful-btn pxr:inline-flex pxr:items-center pxr:gap-1.5 pxr:px-3 pxr:py-1 pxr:rounded-full pxr:border pxr:text-xs pxr:font-medium pxr:cursor-pointer pxr:transition-colors pxr:duration-200 pxr:bg-transparent" data-pxr-helpful-btn data-review-id="' + review.id + '" data-helpful-count="' + hCount + '">'
                                         + '<svg class="pxr:w-3.5 pxr:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z" /><path stroke-linecap="round" stroke-linejoin="round" d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3" /></svg>'

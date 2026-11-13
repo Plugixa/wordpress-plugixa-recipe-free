@@ -101,7 +101,7 @@ if ( ! function_exists( 'plugixa_recipe_rest_nonce' ) ) {
      * Every frontend script config and form reads its nonce from here;
      * CachingTest fails on a frontend file that calls wp_create_nonce( 'wp_rest' ) itself.
      *
-     * @since 1.0.1
+     * @since 1.2.0
      */
     function plugixa_recipe_rest_nonce(): string {
         return is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '';
@@ -183,6 +183,64 @@ if ( ! function_exists( 'plugixa_recipe_archive_url' ) ) {
         }
 
         return home_url( $path );
+    }
+}
+
+if ( ! function_exists( 'plugixa_recipe_link_rel' ) ) {
+    /**
+     * The `rel` of a link an author attached to an ingredient, a tool or a source.
+     *
+     * A link to this site gets none and opens in place. A link elsewhere is not vouched
+     * for by default (`nofollow`) - it is usually a shop - and opens in a new tab, which
+     * is what `noopener` is for.
+     *
+     * @since 1.2.0
+     *
+     * @param string $url The link's address.
+     * @return string Empty for a link to this site.
+     */
+    function plugixa_recipe_link_rel( string $url ): string {
+        $host = (string) wp_parse_url( $url, PHP_URL_HOST );
+        $own  = (string) wp_parse_url( home_url(), PHP_URL_HOST );
+
+        if ( '' === $host || 0 === strcasecmp( $host, $own ) ) {
+            return '';
+        }
+
+        /**
+         * Filters the rel attribute of an outbound recipe link.
+         *
+         * @since 1.2.0
+         *
+         * @param string $rel Space-separated link types. Default 'nofollow noopener'.
+         * @param string $url The link's address.
+         */
+        return trim( (string) apply_filters( 'plugixa_recipe_link_rel', 'nofollow noopener', $url ) );
+    }
+}
+
+if ( ! function_exists( 'plugixa_recipe_current_url' ) ) {
+    /**
+     * URL of the page being served, for a "log in and come back" link.
+     *
+     * Not get_permalink(): a recipe or archive URL is a rewrite rule over the blog query,
+     * so the "current post" there is the newest blog post.
+     *
+     * @since 1.2.0
+     *
+     * @return string
+     */
+    function plugixa_recipe_current_url(): string {
+        global $wp;
+
+        $path = isset( $wp->request ) ? (string) $wp->request : '';
+
+        if ( '' === $path ) {
+            // Front page, or plain permalinks, where the path carries nothing.
+            return is_singular() ? (string) get_permalink() : home_url( '/' );
+        }
+
+        return home_url( user_trailingslashit( $path ) );
     }
 }
 

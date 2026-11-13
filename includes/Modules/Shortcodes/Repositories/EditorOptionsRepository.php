@@ -78,6 +78,22 @@ final class EditorOptionsRepository extends Repository {
     }
 
     /**
+     * Published recipes for the "Recipe" block and Elementor widget, by title. Capped:
+     * the list is printed into the editor page.
+     *
+     * @return array<int, array<string, mixed>>|null
+     */
+    public function recipes() {
+        global $wpdb;
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom plugin table; one small read, editor load only.
+        return $wpdb->get_results(
+            $wpdb->prepare('SELECT id, title FROM %i WHERE status = \'published\' ORDER BY title ASC, id ASC LIMIT 500', $this->table('recipes')),
+            ARRAY_A
+        );
+    }
+
+    /**
      * Saved shortcodes for the Elementor control.
      *
      * @return array<int, array<string, mixed>>|null

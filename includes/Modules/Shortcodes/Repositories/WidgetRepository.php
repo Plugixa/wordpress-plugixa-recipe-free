@@ -528,6 +528,20 @@ final class WidgetRepository extends Repository {
     }
 
     /**
+     * Every course, for the expanded search box. Read-through object cache; the query
+     * takes no inputs.
+     *
+     * @return mixed
+     */
+    public function search_courses() {
+        global $wpdb;
+
+        return $this->remember_as('courses', 'widget_search_options', function () use ($wpdb) {
+            return $wpdb->get_results($wpdb->prepare('SELECT id, name, slug FROM %i ORDER BY display_order ASC, id ASC', $this->table('courses')));
+        });
+    }
+
+    /**
      * Every cuisine, for the expanded search box. Read-through object cache; the query
      * takes no inputs.
      *

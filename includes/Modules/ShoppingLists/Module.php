@@ -6,6 +6,7 @@
 namespace PlugixaRecipe\Modules\ShoppingLists;
 
 use PlugixaRecipe\Core\Modules\AbstractModule;
+use PlugixaRecipe\Modules\ShoppingLists\Http\FrontendShoppingListController;
 use PlugixaRecipe\Modules\ShoppingLists\Http\ShoppingListsController;
 
 defined('ABSPATH') || exit;
@@ -32,7 +33,7 @@ final class Module extends AbstractModule {
     public function labels(): array {
         return [
             'label'       => __('Shopping Lists', 'plugixa-recipe'),
-            'description' => __('Visitors add a recipe\'s ingredients to a shopping list.', 'plugixa-recipe'),
+            'description' => __('Shopping lists built from a recipe or a meal plan, kept in the admin.', 'plugixa-recipe'),
         ];
     }
 
@@ -46,6 +47,7 @@ final class Module extends AbstractModule {
     public function registerRoutes(): void {
         $this->routes([
             ShoppingListsController::class,
+            FrontendShoppingListController::class,
         ]);
     }
 }
