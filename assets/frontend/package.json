@@ -1,0 +1,17 @@
+{
+  "name": "plugixa-recipe-frontend",
+  "private": true,
+  "scripts": {
+    "build": "tailwindcss -i src/frontend.css -o build/css/frontend.css --minify && node ../build-tools/stamp-source-banner.mjs frontend && node ../build-tools/stamp-source-banner.mjs vendor",
+    "watch": "tailwindcss -i src/frontend.css -o build/css/frontend.css --watch",
+    "postinstall": "node -e \"const fs=require('fs'),p=require('path');function c(s,d){fs.mkdirSync(p.dirname(d),{recursive:true});fs.copyFileSync(s,d)}c('node_modules/swiper/swiper-bundle.min.js','vendor/swiper/swiper-bundle.min.js');c('node_modules/swiper/swiper-bundle.min.css','vendor/swiper/swiper-bundle.min.css');c('node_modules/glightbox/dist/js/glightbox.min.js','vendor/glightbox/glightbox.min.js');c('node_modules/glightbox/dist/css/glightbox.min.css','vendor/glightbox/glightbox.min.css')\""
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  },
+  "dependencies": {
+    "swiper": "^12.1.2",
+    "glightbox": "^3.3.0"
+  }
+}

@@ -1,0 +1,27 @@
+{
+    "name": "plugixa/plugixa-recipe",
+    "description": "Plugixa Recipe - Modern WordPress Recipe Management Plugin",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Plugixa",
+            "homepage": "https://plugixa.com"
+        }
+    ],
+    "require": {
+        "php": ">=8.0",
+        "freemius/wordpress-sdk": "2.13.4"
+    },
+    "autoload": {
+        "classmap": [
+            "includes/"
+        ]
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

@@ -1,0 +1,6 @@
+/*! Plugixa Recipe -- compiled bundle. Do not edit; regenerated on every build.
+ * Human-readable source: assets/backend/app/src/ -- React admin application (TypeScript, MUI)
+ * Rebuild: cd assets/backend/app && npm install && npm run build   (Node.js 20.19+ or 22.12+)
+ * License: GPLv2 or later -- https://www.gnu.org/licenses/gpl-2.0.html
+ */
+/*! Plugixa Recipe -- compiled bundle -- source: assets/backend/app/src/ | rebuild: cd assets/backend/app && npm install && npm run build | GPLv2 or later */function e(e,t=`en-US`){if(!e)return``;try{return new Date(e).toLocaleDateString(t,{year:`numeric`,month:`short`,day:`numeric`})}catch{return e}}function t(e){return{draft:`Draft`,published:`Published`,pending:`Pending Review`,archived:`Archived`}[e]||e}function n(e){return{draft:`default`,published:`success`,pending:`warning`,archived:`error`}[e]||`default`}function r(e){if(!e||e<=0)return`-`;let t=Math.floor(e/60),n=e%60;return t===0?`${n}m`:n===0?`${t}h`:`${t}h ${n}m`}function i(e){return{easy:`Easy`,medium:`Medium`,hard:`Hard`,expert:`Expert`}[e]||e}export{t as a,n as i,i as n,r,e as t};

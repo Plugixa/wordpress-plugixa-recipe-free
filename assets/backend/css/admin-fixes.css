@@ -1,0 +1,35 @@
+/*
+ * Copyright (C) 2026 Plugixa (https://plugixa.com)
+ * License: GNU General Public License v2 or later
+ * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
+ */
+
+/*
+ * WordPress media modal z-index.
+ *
+ * App.tsx raises MUI's overlays to z-index 100000+ so dialogs and menus clear the admin
+ * bar. The WP media modal that ImagePicker / GalleryPicker open sits at 160000 by default
+ * in some themes but 100100 in core, so it is pinned above the app's overlays here.
+ *
+ * This is the only rule left in this file. What used to be here and why it went:
+ *
+ * - #wpcontent padding, #wpbody-content padding, #wpfooter hiding, #plugixa-recipe-root
+ *   margin: moved into Assets::reset_admin_chrome(), body-scoped via a single
+ *   `plugixa-recipe-screen` class rather than a hand-maintained list of nine page slugs.
+ * - The admin-notice hiding: removed. It only ever applied to the Dashboard screen, and it
+ *   suppressed Freemius licence prompts and genuine WordPress warnings.
+ * - A `body.plugixa-recipe-fullscreen` block: removed as dead code. The fullscreen toggle in
+ *   Layout.tsx sets inline styles on #plugixa-recipe-root directly and never adds that class,
+ *   so none of those rules had ever applied. (Side effect worth knowing: because the CSS
+ *   never ran, "fullscreen" does not actually hide the admin bar or menu.)
+ * - The real wp-admin conflict is not patched here at all - it is fixed by REMOVING
+ *   wp-admin's `forms` stylesheet from this screen. See Assets::strip_unused_admin_styles().
+ */
+
+.media-modal {
+    z-index: 100500 !important;
+}
+
+.media-modal-backdrop {
+    z-index: 100499 !important;
+}

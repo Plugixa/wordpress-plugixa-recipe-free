@@ -1,0 +1,6 @@
+/*! Plugixa Recipe -- compiled bundle. Do not edit; regenerated on every build.
+ * Human-readable source: assets/backend/app/src/ -- React admin application (TypeScript, MUI)
+ * Rebuild: cd assets/backend/app && npm install && npm run build   (Node.js 20.19+ or 22.12+)
+ * License: GPLv2 or later -- https://www.gnu.org/licenses/gpl-2.0.html
+ */
+/*! Plugixa Recipe -- compiled bundle -- source: assets/backend/app/src/ | rebuild: cd assets/backend/app && npm install && npm run build | GPLv2 or later */import{Ct as e,Mt as t,c as n,l as r,m as i}from"./queryClient-YBIL49Fb.js";import{m as a}from"./TextField-D03uzVEo.js";t();var o=e(),s=({title:e,subtitle:t,action:s,children:c,noPadding:l=!1,sx:u})=>(0,o.jsxs)(i,{variant:`outlined`,sx:{mb:2,overflow:`hidden`,border:`1px solid #c3c4c7`,boxShadow:`0 1px 1px rgba(0,0,0,.04)`,...u&&!Array.isArray(u)?u:{}},children:[(0,o.jsxs)(n,{sx:{display:`flex`,alignItems:`center`,justifyContent:`space-between`,px:2,py:1.5,backgroundColor:`#f8f9fa`},children:[(0,o.jsxs)(n,{children:[(0,o.jsx)(r,{variant:`subtitle1`,sx:{fontWeight:700,fontSize:`14px`},children:e}),t&&(0,o.jsx)(r,{variant:`body2`,color:`text.secondary`,sx:{fontSize:`12px`},children:t})]}),s&&(0,o.jsx)(n,{children:s})]}),(0,o.jsx)(a,{}),(0,o.jsx)(n,{sx:l?{}:{p:2},children:c})]});export{s as t};

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wpml-config>
+    <shortcodes>
+        <shortcode>
+            <tag>plugixa_recipe</tag>
+            <attributes>
+                <attribute>id</attribute>
+                <attribute>view</attribute>
+                <attribute>categories</attribute>
+                <attribute>cuisines</attribute>
+                <attribute>courses</attribute>
+                <attribute>limit</attribute>
+                <attribute>orderby</attribute>
+                <attribute>order</attribute>
+                <attribute>featured</attribute>
+                <attribute>min_rating</attribute>
+                <attribute>difficulty</attribute>
+                <attribute>columns</attribute>
+                <attribute>dark_mode</attribute>
+                <attribute>pagination</attribute>
+                <attribute>per_page</attribute>
+            </attributes>
+        </shortcode>
+        <shortcode>
+            <tag>plugixa_recipes</tag>
+            <attributes>
+                <attribute>id</attribute>
+                <attribute>view</attribute>
+                <attribute>categories</attribute>
+                <attribute>cuisines</attribute>
+                <attribute>courses</attribute>
+                <attribute>limit</attribute>
+                <attribute>orderby</attribute>
+                <attribute>order</attribute>
+                <attribute>featured</attribute>
+                <attribute>min_rating</attribute>
+                <attribute>difficulty</attribute>
+                <attribute>columns</attribute>
+                <attribute>dark_mode</attribute>
+                <attribute>pagination</attribute>
+                <attribute>per_page</attribute>
+            </attributes>
+        </shortcode>
+        <shortcode>
+            <tag>plugixa_recipe_form</tag>
+            <attributes>
+                <attribute>style</attribute>
+                <attribute>categories</attribute>
+                <attribute>redirect</attribute>
+            </attributes>
+        </shortcode>
+    </shortcodes>
+
+    <admin-texts>
+        <key name="plugixa_recipe_settings">
+            <key name="notification_subject" />
+            <key name="notification_message" />
+        </key>
+    </admin-texts>
+
+    <language-switcher-settings>
+        <key name="plugixa_recipe_language" action="custom" />
+    </language-switcher-settings>
+</wpml-config>

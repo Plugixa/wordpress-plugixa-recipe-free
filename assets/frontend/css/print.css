@@ -1,0 +1,218 @@
+/*
+ * Copyright (C) 2026 Plugixa (https://plugixa.com)
+ * License: GNU General Public License v2 or later
+ * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
+ */
+
+/**
+ * PlugixaRecipe Print View Styles
+ *
+ * Loaded only on the /recipe-print/{id}/ standalone document, enqueued as the
+ * handle "plugixa-recipe-print" by PlugixaRecipe\Frontend\RecipePrint.
+ */
+
+/* Reset & Base */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #1a1a1a;
+    background: #fff;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+h1 {
+    font-size: 28px;
+    line-height: 1.2;
+    margin-bottom: 8px;
+}
+
+h2 {
+    font-size: 20px;
+    margin-top: 24px;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #333;
+}
+
+h3 {
+    font-size: 16px;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #555;
+}
+
+.pxr-print-header {
+    border-bottom: 3px solid #000;
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+}
+
+.pxr-print-description {
+    font-style: italic;
+    color: #444;
+    margin-bottom: 12px;
+}
+
+.pxr-print-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+
+.pxr-print-meta dt {
+    font-weight: bold;
+    display: inline;
+}
+
+.pxr-print-meta dd {
+    display: inline;
+    margin-left: 4px;
+}
+
+.pxr-print-meta-item {
+    display: flex;
+    gap: 4px;
+}
+
+.pxr-print-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    margin-bottom: 16px;
+}
+
+.pxr-print-ingredients ul {
+    list-style: disc;
+    padding-left: 24px;
+}
+
+.pxr-print-ingredients li {
+    margin-bottom: 4px;
+}
+
+.pxr-print-instructions ol {
+    padding-left: 24px;
+}
+
+.pxr-print-instructions li {
+    margin-bottom: 12px;
+    padding-left: 4px;
+}
+
+/* Nutrition Table */
+.pxr-print-nutrition-table {
+    width: 100%;
+    max-width: 400px;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 13px;
+}
+
+.pxr-print-nutrition-table th,
+.pxr-print-nutrition-table td {
+    text-align: left;
+    padding: 4px 8px;
+    border-bottom: 1px solid #ddd;
+}
+
+.pxr-print-nutrition-table th {
+    font-weight: bold;
+    background: #f5f5f5;
+}
+
+.pxr-print-nutrition-table td:last-child {
+    text-align: right;
+}
+
+/* Footer */
+.pxr-print-footer {
+    margin-top: 32px;
+    padding-top: 12px;
+    border-top: 1px solid #ccc;
+    font-size: 11px;
+    color: #888;
+    text-align: center;
+}
+
+/* Print button (hidden when printing) */
+.pxr-print-action {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.pxr-print-action button {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 32px;
+    border: 2px solid #333;
+    background: #fff;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.pxr-print-action button:hover {
+    background: #f5f5f5;
+}
+
+/* Print-specific styles */
+@media print {
+    body {
+        padding: 0;
+        font-size: 12px;
+    }
+
+    .pxr-print-action {
+        display: none !important;
+    }
+
+    .pxr-print-image {
+        max-width: 50%;
+    }
+
+    h1 {
+        font-size: 24px;
+    }
+
+    h2 {
+        font-size: 18px;
+        margin-top: 18px;
+        page-break-after: avoid;
+    }
+
+    h3 {
+        page-break-after: avoid;
+    }
+
+    .pxr-print-ingredients,
+    .pxr-print-instructions {
+        page-break-inside: avoid;
+    }
+
+    .pxr-print-instructions li {
+        page-break-inside: avoid;
+    }
+
+    a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .pxr-print-footer a::after {
+        content: " (" attr(href) ")";
+    }
+}
