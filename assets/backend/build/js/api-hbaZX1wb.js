@@ -1,0 +1,1 @@
+import{a as e,i as t,n,t as r}from"./api-DjTj7zpj.js";var i=`/shortcodes`,a={getList:e=>n(i,e),getById:e=>n(`${i}/${e}`),create:e=>t(i,e),update:(t,n)=>e(`${i}/${t}`,n),delete:e=>r(`${i}/${e}`),bulkDelete:e=>t(`${i}/bulk-delete`,{ids:e}),duplicate:e=>t(`${i}/${e}/duplicate`)};export{a as t};

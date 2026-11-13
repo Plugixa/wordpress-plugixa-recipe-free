@@ -7,6 +7,8 @@
 
 namespace PlugixaRecipe\Core\Admin;
 
+use PlugixaRecipe\Core\App\Edition;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -323,7 +325,14 @@ class Assets {
             // premium build". There is no runtime licence object: the free build ships no
             // pro UI to gate, so this flag is purely informational (it lets a screen skip
             // a query whose route does not exist in free).
-            'isPro'        => is_dir(PLUGIXA_RECIPE_PATH . 'pro/'),
+            'isPro'        => Edition::is_premium(),
+            // `free` or `premium`. The free build shows a Pro features page and an upgrade
+            // button to whoever manages settings; the premium build carries the same free
+            // code and must not, so the app asks this rather than the presence of a screen.
+            'edition'      => Edition::current(),
+            // Where "See Pro plans" goes. A link the admin clicks, never a request. It travels
+            // from here so the app's own source names no outside host.
+            'pricingUrl'   => Edition::PRICING_URL,
             // Top bar: "View site", the non-production pill, and the account menu's log out.
             'homeUrl'      => esc_url_raw(home_url('/')),
             'env'          => wp_get_environment_type(),

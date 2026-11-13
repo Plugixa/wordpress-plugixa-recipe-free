@@ -1,1 +1,0 @@
-import{t as e,u as t}from"./schemas-DB7s7LkT.js";function n(n){return t(e,n)}export{n as t};

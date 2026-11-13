@@ -31,6 +31,7 @@ class ComposerStaticInit7b692e56ed75fd27ccf6f12f3113a393
         'PlugixaRecipe\\Core\\Admin\\Assets' => __DIR__ . '/../..' . '/includes/Core/Admin/Assets.php',
         'PlugixaRecipe\\Core\\Admin\\Hmr' => __DIR__ . '/../..' . '/includes/Core/Admin/Hmr.php',
         'PlugixaRecipe\\Core\\Admin\\Strings' => __DIR__ . '/../..' . '/includes/Core/Admin/Strings.php',
+        'PlugixaRecipe\\Core\\App\\Edition' => __DIR__ . '/../..' . '/includes/Core/App/Edition.php',
         'PlugixaRecipe\\Core\\Container' => __DIR__ . '/../..' . '/includes/Core/Container.php',
         'PlugixaRecipe\\Core\\Database\\Cache' => __DIR__ . '/../..' . '/includes/Core/Database/Cache.php',
         'PlugixaRecipe\\Core\\Database\\Repository' => __DIR__ . '/../..' . '/includes/Core/Database/Repository.php',

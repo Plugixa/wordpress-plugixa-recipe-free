@@ -1,0 +1,1 @@
+import{Tt as e,p as t,r as n}from"./Button-ErrbGwSD.js";import{r}from"./i18n-ChBa22dH.js";var i=e();function a({title:e,action:a,children:o}){return(0,i.jsxs)(t,{variant:`outlined`,sx:{p:2},children:[(0,i.jsxs)(r,{direction:`row`,sx:{alignItems:`center`,mb:2},children:[(0,i.jsx)(n,{variant:`subtitle1`,sx:{fontWeight:600,flex:1},children:e}),a]}),o]})}export{a as t};

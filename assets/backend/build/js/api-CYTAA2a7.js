@@ -1,1 +1,0 @@
-import{a as e,i as t,n,r,t as i}from"./api-DK4NBYg4.js";var a=`/reviews`,o={getList:e=>n(a,e),getById:e=>n(`${a}/${e}`),update:(t,n)=>e(`${a}/${t}`,n),delete:e=>i(`${a}/${e}`),bulkDelete:e=>i(`${a}/bulk`,{ids:e}),changeStatus:(e,t)=>r(`${a}/${e}/status`,{status:t}),bulkAction:(e,n,r)=>t(`${a}/bulk-action`,{action:e,ids:n,...r})};export{o as t};

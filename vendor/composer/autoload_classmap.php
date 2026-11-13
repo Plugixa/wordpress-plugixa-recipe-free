@@ -12,6 +12,7 @@ return array(
     'PlugixaRecipe\\Core\\Admin\\Assets' => $baseDir . '/includes/Core/Admin/Assets.php',
     'PlugixaRecipe\\Core\\Admin\\Hmr' => $baseDir . '/includes/Core/Admin/Hmr.php',
     'PlugixaRecipe\\Core\\Admin\\Strings' => $baseDir . '/includes/Core/Admin/Strings.php',
+    'PlugixaRecipe\\Core\\App\\Edition' => $baseDir . '/includes/Core/App/Edition.php',
     'PlugixaRecipe\\Core\\Container' => $baseDir . '/includes/Core/Container.php',
     'PlugixaRecipe\\Core\\Database\\Cache' => $baseDir . '/includes/Core/Database/Cache.php',
     'PlugixaRecipe\\Core\\Database\\Repository' => $baseDir . '/includes/Core/Database/Repository.php',

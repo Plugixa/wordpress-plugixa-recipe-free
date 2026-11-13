@@ -50,6 +50,41 @@ final class Strings {
             'picker_loading'       => __('Searching...', 'plugixa-recipe'),
             'picker_none'          => __('Nothing found', 'plugixa-recipe'),
             'picker_placeholder'   => __('Type to search', 'plugixa-recipe'),
+
+            // The free build's Pro features page, header button, dashboard card and App
+            // Manager line (src/modules/pro-features). Never shown by the premium build: see
+            // Core\App\Edition.
+            'pro_nav'            => __('Upgrade to Pro', 'plugixa-recipe'),
+            'pro_see_features'   => __('See Pro features', 'plugixa-recipe'),
+            'pro_see_plans'      => __('See Pro plans', 'plugixa-recipe'),
+            'pro_compare_plans'  => __('Compare plans', 'plugixa-recipe'),
+            'pro_page_title'     => __('Plugixa Recipe Pro', 'plugixa-recipe'),
+            'pro_page_intro'     => __('Everything in the free plugin keeps working. Pro adds the tools below for writing recipes faster, moving them between sites and plugins, and selling alongside them. Your recipes, reviews and settings stay as they are when you upgrade.', 'plugixa-recipe'),
+            'pro_owned_note'     => __('Already bought Pro? Download it from your Plugixa account and install it. It takes over from this plugin and keeps all your data.', 'plugixa-recipe'),
+            'pro_group_writing'  => __('Writing recipes', 'plugixa-recipe'),
+            'pro_group_moving'   => __('Moving recipes', 'plugixa-recipe'),
+            'pro_group_growing'  => __('Growing your site', 'plugixa-recipe'),
+            'pro_f_ai'           => __('AI recipe drafting', 'plugixa-recipe'),
+            'pro_f_ai_desc'      => __('Draft a full recipe from a topic, a web address or a document, then edit it before you publish.', 'plugixa-recipe'),
+            'pro_f_fields'       => __('Custom fields', 'plugixa-recipe'),
+            'pro_f_fields_desc'  => __('Add your own fields to the recipe form and show them on the recipe page.', 'plugixa-recipe'),
+            'pro_f_demo'         => __('Demo content', 'plugixa-recipe'),
+            'pro_f_demo_desc'    => __('Fill a new site with sample recipes in one click to try every layout, and remove them again.', 'plugixa-recipe'),
+            'pro_f_files'        => __('Import and export', 'plugixa-recipe'),
+            'pro_f_files_desc'   => __('Move recipes in and out as CSV or JSON, with their ingredients, steps and nutrition.', 'plugixa-recipe'),
+            'pro_f_plugins'      => __('Import from other recipe plugins', 'plugixa-recipe'),
+            'pro_f_plugins_desc' => __('Bring recipes over from WP Recipe Maker, Tasty Recipes, Create by Mediavine, WP Delicious, Cooked, Zip Recipes and Recipe Card Blocks.', 'plugixa-recipe'),
+            'pro_f_seo'          => __('SEO analyzer', 'plugixa-recipe'),
+            'pro_f_seo_desc'     => __('A score for each recipe against on-page and rich result checks, with a site-wide overview.', 'plugixa-recipe'),
+            'pro_f_shop'         => __('WooCommerce products', 'plugixa-recipe'),
+            'pro_f_shop_desc'    => __('Link recipes to products and show them in a tab on the product page.', 'plugixa-recipe'),
+            'pro_f_support'      => __('Priority support', 'plugixa-recipe'),
+            'pro_f_support_desc' => __('Faster answers from the team that builds the plugin.', 'plugixa-recipe'),
+            'pro_card_title'     => __('Get more from Plugixa Recipe', 'plugixa-recipe'),
+            'pro_card_body'      => __('AI recipe drafting, imports from other recipe plugins, an SEO analyzer and WooCommerce products come with Pro.', 'plugixa-recipe'),
+            'pro_card_hide'      => __('Hide this card', 'plugixa-recipe'),
+            'pro_apps_more'      => __('More apps come with Pro.', 'plugixa-recipe'),
+            'pro_apps_link'      => __('See what Pro adds', 'plugixa-recipe'),
         ];
     }
 }

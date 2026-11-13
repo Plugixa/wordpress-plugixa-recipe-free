@@ -1,1 +1,0 @@
-import"./rolldown-runtime-hePW80VL.js";import{dn as e,ln as t}from"./api-DK4NBYg4.js";import{U as n}from"./main-DbPIYb8e.js";import{o as r,s as i}from"./formatters-na3Zof6v.js";e();var a=t(),o=({status:e,size:t=`small`,variant:o=`filled`})=>(0,a.jsx)(n,{label:i(e),color:r(e),size:t,variant:o});export{o as t};
