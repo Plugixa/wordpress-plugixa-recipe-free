@@ -36,6 +36,7 @@ final class TaxonomyWidget extends Widget {
             'show_count' => 'true',
             'style'      => 'list',          // list, pills, grid
             'exclude'    => '',
+            'hide_empty' => 'false',
             'title'      => '',
         ], $atts, 'plugixa_categories' );
 
@@ -56,6 +57,7 @@ final class TaxonomyWidget extends Widget {
             'show_count' => 'true',
             'style'      => 'list',
             'exclude'    => '',
+            'hide_empty' => 'false',
             'title'      => '',
         ], $atts, 'plugixa_cuisines' );
 
@@ -98,13 +100,24 @@ final class TaxonomyWidget extends Widget {
         // 'recipes' - see WidgetRepository::terms_with_counts().
         $items = $this->widgets()->terms_with_counts( $type, $exclude_ids, $lang, $orderby, $order_alias, $order, $limit );
 
+        // hide_empty: only the terms a visitor would find a recipe under. Applied to the rows
+        // the query returned, so `limit` counts terms before the empty ones are dropped.
+        if ( filter_var( $atts['hide_empty'], FILTER_VALIDATE_BOOLEAN ) ) {
+            $items = array_values( array_filter( (array) $items, static fn( $item ) => (int) $item->recipe_count > 0 ) );
+        }
+
         if ( empty( $items ) ) {
             return '';
         }
 
+        // The term whose archive this page is, if it is one of this kind: its link is marked.
+        $archive      = (array) ( $GLOBALS['plugixa_recipe_archive_data'] ?? [] );
+        $current_slug = ( $archive['type'] ?? '' ) === $type ? (string) ( $archive['taxonomy']->slug ?? '' ) : '';
+
         // Build permalink for each item
         foreach ( $items as $item ) {
-            $item->permalink = home_url( "/{$archive_base}/" . rawurlencode( $item->slug ) . '/' );
+            $item->permalink  = home_url( "/{$archive_base}/" . rawurlencode( $item->slug ) . '/' );
+            $item->is_current = '' !== $current_slug && $item->slug === $current_slug;
             if ( ! empty( $item->image_id ) ) {
                 $item->image_url = wp_get_attachment_image_url( (int) $item->image_id, 'thumbnail' ) ?: '';
             } else {

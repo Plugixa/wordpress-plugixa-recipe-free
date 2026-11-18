@@ -747,6 +747,21 @@
     margin-bottom: 24px;
 }
 
+/* Two rows of pills that both start with "All" need to say which is which. The row's name
+   comes from the markup (data-pxr-label), so it is translated with the rest. */
+.pxr-custom-category-nav[data-pxr-label]::before,
+.pxr-custom-cuisine-nav[data-pxr-label]::before {
+    content: attr(data-pxr-label);
+    align-self: center;
+    flex-shrink: 0;
+    margin-right: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--pxr-meta-color, #6b7280);
+}
+
 .pxr-custom-category-btn,
 .pxr-custom-cuisine-btn {
     padding: var(--pxr-cat-padding, 8px) calc(var(--pxr-cat-padding, 8px) * 1.67);
@@ -843,15 +858,17 @@
     justify-content: center;
 }
 
+/* The letter is the card colour, not white: in dark mode the title colour is near white,
+   and a white letter on it could not be read. */
 .pxr-custom-alpha-btn:hover:not([disabled]) {
     background: var(--pxr-title-color, #1a1a2e);
-    color: #ffffff;
+    color: var(--pxr-card-bg, #ffffff);
     border-color: var(--pxr-title-color, #1a1a2e);
 }
 
 .pxr-custom-alpha-btn--active {
     background: var(--pxr-title-color, #1a1a2e);
-    color: #ffffff;
+    color: var(--pxr-card-bg, #ffffff);
     border-color: var(--pxr-title-color, #1a1a2e);
 }
 
@@ -868,6 +885,7 @@
 }
 
 .pxr-custom-ingredient-search {
+    box-sizing: border-box;
     border: 1px solid var(--pxr-border-color, #e5e7eb);
     background: transparent;
     color: var(--pxr-text-color, #374151);
@@ -884,6 +902,35 @@
 
 .pxr-custom-ingredient-search::placeholder {
     color: var(--pxr-meta-color, #9ca3af);
+}
+
+/* A phone: each bar is one row that scrolls sideways, not three wrapped rows above the
+   first recipe. */
+@media (max-width: 640px) {
+    .pxr-custom-category-nav:not(.pxr-custom-category-nav--dropdown),
+    .pxr-custom-cuisine-nav,
+    .pxr-custom-alpha-nav {
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        overflow-x: auto;
+        scrollbar-width: none;
+        margin-left: -0.75rem;
+        margin-right: -0.75rem;
+        padding: 2px 0.75rem;
+    }
+
+    .pxr-custom-category-nav::-webkit-scrollbar,
+    .pxr-custom-cuisine-nav::-webkit-scrollbar,
+    .pxr-custom-alpha-nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    .pxr-custom-category-btn,
+    .pxr-custom-cuisine-btn,
+    .pxr-custom-alpha-btn {
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
 }
 
 /* ─── Pagination ──────────────────────────────── */
@@ -1462,6 +1509,30 @@
     display: none;
 }
 
+/* The ingredient tools and "Add to shopping list" are two bars from two modules. Inline,
+   they share a row while there is room and break between the bars, not inside one. */
+.pxr-tools--inline:not([hidden]) {
+    display: inline-flex;
+    vertical-align: top;
+    margin-right: 12px;
+}
+
+/* An action (copy, add to list), told apart from the switches beside it by its icon. */
+.pxr-tools__btn--action {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.pxr-tools__btn--action svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.pxr-tools__status:empty {
+    display: none;
+}
+
 .pxr-tools__group {
     display: inline-flex;
     border: 1px solid var(--pxr-border-color, #e5e7eb);
@@ -1878,11 +1949,6 @@
 
 .pxr-surprise {
     display: inline-block;
-}
-
-.pxr-widget-search__filters .pxr-widget-search__select {
-    flex: 1 1 150px;
-    min-width: 0;
 }
 
 @media print {
@@ -2770,6 +2836,14 @@
 }
 
 /* ─── Dark Mode ───────────────────────────────── */
+/* A dark listing is a panel on a page that may be light: room inside its edges, or the
+   first row of pills and the last button sit on the border between the two. */
+.pxr-recipes-wrapper.pxr-dark {
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-radius: var(--pxr-border-radius, 12px);
+}
+
 .pxr-dark {
     --pxr-card-bg: #1e1e2e;
     --pxr-text-color: #e5e7eb;
@@ -3036,6 +3110,10 @@
 }
 
 /* ─── Taxonomy Widget (Categories/Cuisines) ────── */
+/* Measured, not the screen: the same widget sits in a sidebar and in a page column. */
+.pxr-widget-taxonomy {
+    container-type: inline-size;
+}
 
 /* List style */
 .pxr-widget-taxonomy__list {
@@ -3045,6 +3123,7 @@
 }
 
 .pxr-widget-taxonomy__list-item {
+    margin: 0;
     border-bottom: 1px solid var(--pxr-border-color, #f0f0f0);
 }
 
@@ -3053,83 +3132,187 @@
 }
 
 .pxr-widget-taxonomy__link {
+    box-sizing: border-box;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 4px;
+    gap: 10px;
+    min-height: 44px;
+    padding: 8px 10px;
+    border-radius: var(--pxr-border-radius, 8px);
     color: var(--pxr-text-color, #1a1a2e);
     text-decoration: none;
     font-size: 15px;
-    transition: color 0.2s ease, padding-left 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease;
 }
 
 .pxr-widget-taxonomy__link:hover {
     color: var(--pxr-title-hover-color, #e53e3e);
-    padding-left: 8px;
+    background-color: var(--pxr-cat-bg, #f3f4f6);
+    text-decoration: none;
 }
 
 .pxr-widget-taxonomy__chevron {
     color: var(--pxr-title-hover-color, #e53e3e);
     flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.pxr-widget-taxonomy__link:hover .pxr-widget-taxonomy__chevron {
+    transform: translateX(2px);
 }
 
 .pxr-widget-taxonomy__name {
     flex: 1;
+    min-width: 0;
 }
 
 .pxr-widget-taxonomy__count {
+    flex-shrink: 0;
     font-size: 13px;
+    font-variant-numeric: tabular-nums;
     color: var(--pxr-meta-color, #6b7280);
 }
 
+.pxr-widget-taxonomy__link--current {
+    font-weight: 700;
+    color: var(--pxr-title-color, #1a1a2e);
+    background-color: var(--pxr-cat-bg, #f3f4f6);
+}
+
 /* Pills style */
+.pxr-widget-taxonomy__pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
 .pxr-widget-taxonomy__pill {
+    box-sizing: border-box;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    min-height: 36px;
     padding: 6px 14px;
     background: var(--pxr-cat-bg, #f3f4f6);
     color: var(--pxr-cat-text, #374151);
     border-radius: 9999px;
     font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+    white-space: nowrap;
     text-decoration: none;
-    transition: background 0.2s ease, color 0.2s ease;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
     border: 1px solid var(--pxr-border-color, #e5e7eb);
 }
 
 .pxr-widget-taxonomy__pill:hover {
-    background: var(--pxr-cat-active-bg, #e53e3e);
+    border-color: var(--pxr-cat-active-bg, var(--pxr-title-color, #1a1a2e));
+    color: var(--pxr-title-color, #1a1a2e);
+    text-decoration: none;
+}
+
+.pxr-widget-taxonomy__pill--current,
+.pxr-widget-taxonomy__pill--current:hover {
+    background: var(--pxr-cat-active-bg, var(--pxr-title-color, #1a1a2e));
+    border-color: var(--pxr-cat-active-bg, var(--pxr-title-color, #1a1a2e));
     color: var(--pxr-cat-active-text, #ffffff);
-    border-color: var(--pxr-cat-active-bg, #e53e3e);
 }
 
 .pxr-widget-taxonomy__pill-count {
     font-size: 12px;
-    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.65;
 }
 
-/* Grid style */
+/* Grid style: as many cards across as fit, never fewer than two. */
+.pxr-widget-taxonomy__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 12px;
+}
+
+@container (max-width: 300px) {
+    .pxr-widget-taxonomy__grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 .pxr-widget-taxonomy__card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 18px 12px 16px;
+    text-align: center;
     background: var(--pxr-card-bg, #ffffff);
     border: 1px solid var(--pxr-border-color, #e5e7eb);
+    border-radius: var(--pxr-border-radius, 12px);
     text-decoration: none;
     color: var(--pxr-text-color, #1a1a2e);
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 
 .pxr-widget-taxonomy__card:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
     transform: translateY(-2px);
+    text-decoration: none;
+}
+
+.pxr-widget-taxonomy__card--current {
+    border-color: var(--pxr-title-color, #1a1a2e);
+    box-shadow: inset 0 0 0 1px var(--pxr-title-color, #1a1a2e);
+}
+
+.pxr-widget-taxonomy__card-image {
+    width: 72px;
+    height: 72px;
+    margin-bottom: 10px;
+    border-radius: 9999px;
+    object-fit: cover;
+}
+
+.pxr-widget-taxonomy__card-image--letter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--pxr-cat-bg, #f3f4f6);
+    color: var(--pxr-meta-color, #6b7280);
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1;
 }
 
 .pxr-widget-taxonomy__card-name {
     font-weight: 600;
-    font-size: 14px;
+    font-size: 15px;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
 }
 
 .pxr-widget-taxonomy__card-count {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--pxr-meta-color, #6b7280);
+}
+
+.pxr-widget-taxonomy__link:focus-visible,
+.pxr-widget-taxonomy__pill:focus-visible,
+.pxr-widget-taxonomy__card:focus-visible {
+    outline: 2px solid var(--pxr-title-color, #1a1a2e);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pxr-widget-taxonomy__link,
+    .pxr-widget-taxonomy__chevron,
+    .pxr-widget-taxonomy__pill,
+    .pxr-widget-taxonomy__card {
+        transition: none;
+    }
+
+    .pxr-widget-taxonomy__card:hover {
+        transform: none;
+    }
 }
 
 /* ─── Compact Recipe List (Latest/Popular) ─────── */
@@ -3241,13 +3424,28 @@
 }
 
 /* ─── Recipe Search Widget ─────────────────────── */
+/* The form is a grid: the words and the button share the first row, the filters take the
+   second, the choices in force the third. The markup keeps reading order (words, filters,
+   button), so the keyboard meets the filters before the button. */
+.pxr-widget-search {
+    margin-bottom: 1.5rem;
+    /* Measured, not the screen: a 300px sidebar on a wide screen is still narrow. */
+    container-type: inline-size;
+}
+
 .pxr-widget-search__form {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "words  submit"
+        "filter filter"
+        "active active";
+    gap: 10px;
+    margin: 0;
 }
 
 .pxr-widget-search__input-wrap {
+    grid-area: words;
     position: relative;
     display: flex;
     align-items: center;
@@ -3255,57 +3453,192 @@
 
 .pxr-widget-search__icon {
     position: absolute;
-    left: 12px;
+    left: 14px;
     color: var(--pxr-meta-color, #9ca3af);
     pointer-events: none;
 }
 
-.pxr-widget-search__input {
+.pxr-widget-search__input,
+.pxr-widget-search__select {
+    box-sizing: border-box;
     width: 100%;
-    padding: 10px 12px 10px 40px;
+    min-height: 44px;
+    margin: 0;
     border: 1px solid var(--pxr-border-color, #e5e7eb);
     border-radius: var(--pxr-border-radius, 8px);
-    font-size: 15px;
+    font-family: inherit;
+    line-height: 1.4;
     color: var(--pxr-text-color, #1a1a2e);
-    background: var(--pxr-card-bg, #ffffff);
+    background-color: var(--pxr-card-bg, #ffffff);
     outline: none;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.pxr-widget-search__input:focus {
+.pxr-widget-search__input {
+    padding: 10px 12px 10px 42px;
+    font-size: 15px;
+}
+
+.pxr-widget-search__input:hover,
+.pxr-widget-search__select:hover {
+    border-color: var(--pxr-meta-color, #9ca3af);
+}
+
+.pxr-widget-search__input:focus-visible,
+.pxr-widget-search__select:focus-visible {
     border-color: var(--pxr-title-hover-color, #e53e3e);
-    box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.1);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--pxr-title-hover-color, #e53e3e) 18%, transparent);
+}
+
+.pxr-widget-search__filters {
+    grid-area: filter;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
 }
 
 .pxr-widget-search__select {
-    flex: 1;
-    padding: 8px 12px;
-    border: 1px solid var(--pxr-border-color, #e5e7eb);
-    border-radius: var(--pxr-border-radius, 8px);
+    padding: 8px 34px 8px 12px;
     font-size: 14px;
-    color: var(--pxr-text-color, #1a1a2e);
-    background: var(--pxr-card-bg, #ffffff);
-    outline: none;
+    cursor: pointer;
+    text-overflow: ellipsis;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%236b7280' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+}
+
+/* A filter in force: its control says so too. */
+.pxr-widget-search__select--set {
+    border-color: var(--pxr-title-color, #1a1a2e);
+    font-weight: 600;
 }
 
 .pxr-widget-search__submit {
-    padding: 10px 20px;
+    box-sizing: border-box;
+    grid-area: submit;
+    min-height: 44px;
+    padding: 10px 24px;
     background: var(--pxr-title-hover-color, #e53e3e);
     color: #ffffff;
     border: none;
     border-radius: var(--pxr-border-radius, 8px);
+    font-family: inherit;
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s ease, transform 0.1s ease;
+    transition: filter 0.2s ease, transform 0.1s ease;
 }
 
 .pxr-widget-search__submit:hover {
-    filter: brightness(1.1);
+    filter: brightness(1.08);
 }
 
 .pxr-widget-search__submit:active {
     transform: scale(0.98);
+}
+
+/* The choices in force: each chip is a link to this page without that choice. */
+.pxr-widget-search__active {
+    grid-area: active;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    list-style: none;
+    margin: 2px 0 0;
+    padding: 0;
+}
+
+.pxr-widget-search__active li {
+    margin: 0;
+    padding: 0;
+}
+
+.pxr-widget-search__chip {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    padding: 4px 10px 4px 12px;
+    border: 1px solid var(--pxr-border-color, #e5e7eb);
+    border-radius: 9999px;
+    background: var(--pxr-cat-bg, #f3f4f6);
+    color: var(--pxr-cat-text, #374151);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+    text-decoration: none;
+    transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.pxr-widget-search__chip:hover {
+    border-color: var(--pxr-title-color, #1a1a2e);
+    color: var(--pxr-title-color, #1a1a2e);
+    text-decoration: none;
+}
+
+.pxr-widget-search__chip-label {
+    max-width: 16em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pxr-widget-search__chip-x {
+    flex-shrink: 0;
+    opacity: 0.6;
+}
+
+.pxr-widget-search__chip:hover .pxr-widget-search__chip-x {
+    opacity: 1;
+}
+
+.pxr-widget-search__clear {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--pxr-title-hover-color, #e53e3e);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.pxr-widget-search__submit:focus-visible,
+.pxr-widget-search__chip:focus-visible,
+.pxr-widget-search__clear:focus-visible {
+    outline: 2px solid var(--pxr-title-color, #1a1a2e);
+    outline-offset: 2px;
+}
+
+/* A sidebar or a phone: the button under the filters, full width. */
+@container (max-width: 420px) {
+    .pxr-widget-search__form {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            "words"
+            "filter"
+            "submit"
+            "active";
+    }
+
+    .pxr-widget-search__filters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pxr-widget-search__input,
+    .pxr-widget-search__select,
+    .pxr-widget-search__submit,
+    .pxr-widget-search__chip {
+        transition: none;
+    }
 }
 
 /* ─── Recipe of the Day ────────────────────────── */
@@ -3468,6 +3801,40 @@
     margin-bottom: 2rem;
 }
 
+/* The other terms of this kind, under the header: one row that scrolls sideways on a
+   phone instead of pushing the recipes down by four rows of pills. */
+.pxr-archive__terms {
+    margin: 0 0 2rem;
+    padding: 0 0 1.25rem;
+    border-bottom: 1px solid var(--pxr-border-color, #e5e7eb);
+}
+
+.pxr-archive__terms .pxr-widget {
+    margin: 0;
+}
+
+@media (max-width: 640px) {
+    .pxr-archive__terms .pxr-widget-taxonomy__pills {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+        scroll-snap-type: x proximity;
+        /* Snap to the padding, not the edge: without this the first pill is pulled 1rem left. */
+        scroll-padding: 0 1rem;
+        margin: 0 -1rem;
+        padding: 2px 1rem;
+    }
+
+    .pxr-archive__terms .pxr-widget-taxonomy__pills::-webkit-scrollbar {
+        display: none;
+    }
+
+    .pxr-archive__terms .pxr-widget-taxonomy__pill {
+        flex-shrink: 0;
+        scroll-snap-align: start;
+    }
+}
+
 /* ─── Archive Pagination ───────────────────────── */
 .pxr-archive__pagination {
     display: flex;
@@ -3525,36 +3892,39 @@
 
 /* Auto dark mode: respects OS/browser preference */
 @media (prefers-color-scheme: dark) {
+    /* `!important`, reading the palette the page carries (CssVars prints it as
+       `--pxr-dark-*` in auto mode): the light colours are inline on this same element,
+       and an inline value beats any rule that is not important. */
     [data-pxr-dark-mode="auto"] {
-        --pxr-container-bg: #1a1a2e;
-        --pxr-card-bg: #1e1e2e;
-        --pxr-text-color: #e5e7eb;
-        --pxr-title-color: #f9fafb;
-        --pxr-meta-color: #9ca3af;
-        --pxr-star-color: #f59e0b;
-        --pxr-star-empty-color: #4b5563;
-        --pxr-border-color: #374151;
-        --pxr-badge-bg: #374151;
-        --pxr-badge-text: #d1d5db;
-        --pxr-cat-bg: #374151;
-        --pxr-cat-text: #e5e7eb;
-        --pxr-cat-active-bg: #3b82f6;
-        --pxr-cat-active-text: #ffffff;
-        --pxr-cat-border-color: #4b5563;
-        --pxr-pag-bg: #1e1e2e;
-        --pxr-pag-text: #e5e7eb;
-        --pxr-pag-border: #374151;
-        --pxr-pag-active-bg: #3b82f6;
-        --pxr-pag-active-text: #ffffff;
-        --pxr-pag-active-border: #3b82f6;
-        --pxr-pag-lm-bg: #3b82f6;
-        --pxr-pag-lm-text: #ffffff;
-        --pxr-pag-lm-border: #3b82f6;
-        --pxr-pag-lm-hover-bg: #2563eb;
-        --pxr-pag-lm-hover-text: #ffffff;
-        --pxr-pag-lm-hover-border: #2563eb;
-        --pxr-pag-spinner: #3b82f6;
-        --pxr-pag-loading-text: #9ca3af;
+        --pxr-container-bg: var(--pxr-dark-container-bg, #1a1a2e) !important;
+        --pxr-card-bg: var(--pxr-dark-card-bg, #1e1e2e) !important;
+        --pxr-text-color: var(--pxr-dark-text-color, #e5e7eb) !important;
+        --pxr-title-color: var(--pxr-dark-title-color, #f9fafb) !important;
+        --pxr-meta-color: var(--pxr-dark-meta-color, #9ca3af) !important;
+        --pxr-star-color: var(--pxr-dark-star-color, #f59e0b) !important;
+        --pxr-star-empty-color: var(--pxr-dark-star-empty-color, #4b5563) !important;
+        --pxr-border-color: var(--pxr-dark-border-color, #374151) !important;
+        --pxr-badge-bg: var(--pxr-dark-badge-bg, #374151) !important;
+        --pxr-badge-text: var(--pxr-dark-badge-text, #d1d5db) !important;
+        --pxr-cat-bg: var(--pxr-dark-cat-bg, #374151) !important;
+        --pxr-cat-text: var(--pxr-dark-cat-text, #e5e7eb) !important;
+        --pxr-cat-active-bg: var(--pxr-dark-cat-active-bg, #3b82f6) !important;
+        --pxr-cat-active-text: var(--pxr-dark-cat-active-text, #ffffff) !important;
+        --pxr-cat-border-color: var(--pxr-dark-cat-border-color, #4b5563) !important;
+        --pxr-pag-bg: var(--pxr-dark-pag-bg, #1e1e2e) !important;
+        --pxr-pag-text: var(--pxr-dark-pag-text, #e5e7eb) !important;
+        --pxr-pag-border: var(--pxr-dark-pag-border, #374151) !important;
+        --pxr-pag-active-bg: var(--pxr-dark-pag-active-bg, #3b82f6) !important;
+        --pxr-pag-active-text: var(--pxr-dark-pag-active-text, #ffffff) !important;
+        --pxr-pag-active-border: var(--pxr-dark-pag-active-border, #3b82f6) !important;
+        --pxr-pag-lm-bg: var(--pxr-dark-pag-lm-bg, #3b82f6) !important;
+        --pxr-pag-lm-text: var(--pxr-dark-pag-lm-text, #ffffff) !important;
+        --pxr-pag-lm-border: var(--pxr-dark-pag-lm-border, #3b82f6) !important;
+        --pxr-pag-lm-hover-bg: var(--pxr-dark-pag-lm-hover-bg, #2563eb) !important;
+        --pxr-pag-lm-hover-text: var(--pxr-dark-pag-lm-hover-text, #ffffff) !important;
+        --pxr-pag-lm-hover-border: var(--pxr-dark-pag-lm-hover-border, #2563eb) !important;
+        --pxr-pag-spinner: var(--pxr-dark-pag-spinner, #3b82f6) !important;
+        --pxr-pag-loading-text: var(--pxr-dark-pag-loading-text, #9ca3af) !important;
     }
 }
 

@@ -135,7 +135,9 @@
     function initAlphaFilters() {
         initFilterNav(
             '.pxr-custom-alpha-nav',
-            '.pxr-custom-alpha-btn:not([disabled])',
+            // Every letter, the disabled ones too: a disabled button fires no click, and
+            // enableLettersOf() switches one on when a later page brings its recipes.
+            '.pxr-custom-alpha-btn',
             'pxr-custom-alpha-btn--active',
             'data-pxr-letter'
         );
@@ -248,6 +250,27 @@
             });
     }
 
+    /**
+     * The A-Z bar is printed with the first page: a letter no recipe there starts with is
+     * disabled. Once later recipes are on the page, their letters can be chosen too.
+     */
+    function enableLettersOf(container) {
+        var nav = container.querySelector('.pxr-custom-alpha-nav');
+        if (!nav) return;
+
+        container.querySelectorAll('[data-pxr-title]').forEach(function (item) {
+            var letter = (item.getAttribute('data-pxr-title') || '').trim().charAt(0).toUpperCase();
+            if (!/^[A-Z]$/.test(letter)) return;
+
+            var btn = nav.querySelector('[data-pxr-letter="' + letter + '"]');
+            if (!btn || !btn.disabled) return;
+
+            btn.disabled = false;
+            btn.classList.remove('pxr-custom-alpha-btn--disabled', 'pxr:cursor-default');
+            btn.classList.add('pxr:cursor-pointer');
+        });
+    }
+
     function appendListingItems(grid, html) {
         var temp = document.createElement('div');
         temp.innerHTML = html || '';
@@ -255,6 +278,14 @@
             grid.appendChild(item);
         });
         initVideoCards();
+
+        // The bars above the listing filter what is on the page. Recipes that arrive later
+        // are held to the choice already made, or a "Brazilian" listing grows six others.
+        var container = grid.closest('.pxr-custom-container');
+        if (container) {
+            enableLettersOf(container);
+            applyAllFilters(container);
+        }
     }
 
     /** A line under a control that failed, for the controls that have no spinner to speak through. */
@@ -425,6 +456,19 @@
     }
 
     /* ─── Infinite Scroll Pagination ────────────────── */
+    /**
+     * A row of terms that scrolls sideways (the archive's categories on a phone) opens at
+     * its start: the term this page is can be out of sight. Bring it into the row's view,
+     * moving the row only - never the page.
+     */
+    function showCurrentTerm() {
+        document.querySelectorAll('.pxr-widget-taxonomy__pills [aria-current="page"]').forEach(function (pill) {
+            var row = pill.parentElement;
+            if (!row || row.scrollWidth <= row.clientWidth) return;
+            row.scrollLeft = Math.max(0, pill.offsetLeft - row.offsetLeft - (row.clientWidth - pill.offsetWidth) / 2);
+        });
+    }
+
     function initInfiniteScroll() {
         document.querySelectorAll('.pxr-pagination--infinite').forEach(function (pagination) {
             var sentinel = pagination.querySelector('.pxr-infinite-sentinel');
@@ -681,13 +725,21 @@
             var originals = [];
             ingredientSpans.forEach(function (span) {
                 var amountEl = span.querySelector('[data-pxr-ingredient-amount]');
+                var unitEl = span.querySelector('[data-pxr-ingredient-unit]');
                 var raw = span.getAttribute('data-pxr-amount');
                 originals.push({
                     span: span,
                     amountEl: amountEl,
                     original: amountEl ? amountEl.textContent : raw,
                     parsed: parseFraction(raw),
-                    metric: span.getAttribute('data-pxr-unit-system') === 'metric'
+                    metric: span.getAttribute('data-pxr-unit-system') === 'metric',
+                    // The unit beside one and beside several ("clove" / "cloves"), which the
+                    // page prints only for a unit word the site knows. Without them the unit
+                    // is never touched: this script makes no plural of its own.
+                    unitEl: unitEl,
+                    unitOriginal: unitEl ? unitEl.textContent : '',
+                    unitOne: span.getAttribute('data-pxr-unit-one') || '',
+                    unitMany: span.getAttribute('data-pxr-unit-many') || ''
                 });
             });
 
@@ -704,9 +756,16 @@
                     // Back at the recipe's own servings: the author's text, as written.
                     if (ratio === 1) {
                         item.amountEl.textContent = item.original;
+                        if (item.unitEl) item.unitEl.textContent = item.unitOriginal;
                         return;
                     }
-                    item.amountEl.textContent = formatAmount(item.parsed * ratio, item.metric);
+                    var scaled = item.parsed * ratio;
+                    item.amountEl.textContent = formatAmount(scaled, item.metric);
+                    // "2 clove" -> "2 cloves", half of "2 cups" -> "1 cup". More than one is
+                    // plural; the amount is judged as it is shown (two decimals).
+                    if (item.unitEl && item.unitOne && item.unitMany) {
+                        item.unitEl.textContent = Math.round(scaled * 100) / 100 > 1 ? item.unitMany : item.unitOne;
+                    }
                 });
             }
 
@@ -1508,6 +1567,7 @@
         initLoadMore();
         initNumbersPagination();
         initInfiniteScroll();
+        showCurrentTerm();
         initSliders();
         initServingsAdjuster();
         initShareDropdown();

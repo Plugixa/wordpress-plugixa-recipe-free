@@ -132,6 +132,10 @@ final class RecipePresenter {
      * units table knows it as a volume or weight; they are empty for any other line, which
      * a reader's unit switch then leaves as written.
      *
+     * `unit_one` / `unit_many` are the unit beside one and beside several ("clove" /
+     * "cloves"), for a reader who scales the recipe. Empty unless the unit is a name in the
+     * site's units table AND the site reads in English: the plural is English's.
+     *
      * @param array<int, array<string, mixed>> $rows
      * @return array<int, object> { name, items: [ { amount, unit, name, text, notes, ... } ] }
      */
@@ -148,11 +152,14 @@ final class RecipePresenter {
             }
 
             $measure = $units ? $units->resolve((string) ($row['unit'] ?? '')) : null;
+            $words   = $units && UnitResolver::reads_in_english() ? $units->words((string) ($row['unit'] ?? '')) : null;
 
             $current->items[] = (object) [
                 'unit_type'    => $measure['type'] ?? '',
                 'unit_system'  => $measure['system'] ?? '',
                 'unit_factor'  => $measure['factor'] ?? 0.0,
+                'unit_one'     => $words['one'] ?? '',
+                'unit_many'    => $words['many'] ?? '',
                 'amount'       => $row['quantity'] ?? '',
                 'unit'         => $row['unit'] ?? '',
                 'name'         => $row['name'] ?? '',

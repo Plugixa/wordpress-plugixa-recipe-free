@@ -68,6 +68,10 @@ if ( empty( $ingredient_groups ) ) {
                                           data-pxr-unit-system="<?php echo esc_attr( $ingredient->unit_system ); ?>"
                                           data-pxr-unit-factor="<?php echo esc_attr( $ingredient->unit_factor ); ?>"
                                       <?php endif; ?>
+                                      <?php if ( ! empty( $ingredient->unit_one ) && ! empty( $ingredient->unit_many ) ) : ?>
+                                          data-pxr-unit-one="<?php echo esc_attr( $ingredient->unit_one ); ?>"
+                                          data-pxr-unit-many="<?php echo esc_attr( $ingredient->unit_many ); ?>"
+                                      <?php endif; ?>
                                       data-pxr-unit="<?php echo esc_attr( $ingredient->unit ?? '' ); ?>">
                                     <?php if ( ! empty( $ingredient->amount ) ) : ?>
                                         <strong class="pxr-custom-single__ingredient-amount" data-pxr-ingredient-amount>

@@ -4,7 +4,7 @@ Tags: recipe, recipes, recipe card, nutrition, schema
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.4.1
+Stable tag: 1.4.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -242,6 +242,16 @@ WordPress oEmbed provider list: https://developer.wordpress.org/advanced-adminis
 
 == Changelog ==
 
+= 1.4.2 =
+* Changed: the recipe search form puts the words and the button on one row and the filters in a grid, shows one chip per filter in force with "Clear all", and lets a visitor remove a filter by its chip.
+* Changed: category and cuisine lists use a grid that fills the width, show a letter tile for a term with no picture and mark the current term. New `hide_empty` attribute.
+* Added: a category or cuisine archive page lists the other categories or cuisines under its header.
+* Changed: the filter bars above a listing are labelled and scroll sideways, one row per bar, on a phone.
+* Fixed: a grid listing stayed three columns wide on a phone.
+* Fixed: "Load more" ignored the filter chosen in a bar, and the A-Z letters of recipes loaded later stayed disabled.
+* Fixed: dark mode on a listing kept some light colours, both in "Always dark" and in "Follow the system".
+* Fixed: the servings adjuster says "2 cloves" instead of "2 clove" for a unit your units table names as a word, on an English site.
+
 = 1.4.1 =
 * Changed: the settings section for the captcha is called "Spam protection" everywhere in the admin, and the hints that point at it use that name.
 * Tweaked: admin wording.
@@ -319,6 +329,9 @@ WordPress oEmbed provider list: https://developer.wordpress.org/advanced-adminis
 * REST API and developer hooks
 
 == Upgrade Notice ==
+
+= 1.4.2 =
+New look for the search form, term lists and filter bars, grid listings that fit a phone, and dark mode applied in full. Coming from 1.3.0? Read the 1.4.0 notes: several features moved to Pro, and your data is kept.
 
 = 1.4.1 =
 Admin wording fixes. If you are still on 1.3.0, read the 1.4.0 notes: collections, meal plans, shopping lists, recipe submissions, the nutrition calculator and the reader tools moved to Pro, and your data is kept.

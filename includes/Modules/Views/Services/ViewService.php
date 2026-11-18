@@ -312,37 +312,9 @@ final class ViewService {
                 'badgeBg'        => '#f3f4f6',
                 'badgeText'      => '#374151',
             ],
-            'darkMode' => [
-                'enabled'      => false,
-                'containerBg'  => '#1a1a2e',
-                'cardBg'       => '#1e1e2e',
-                'textColor'    => '#e5e7eb',
-                'titleColor'   => '#f9fafb',
-                'metaColor'    => '#9ca3af',
-                'starColor'    => '#f59e0b',
-                'starEmptyColor' => '#4b5563',
-                'borderColor'  => '#374151',
-                'badgeBg'      => '#374151',
-                'badgeText'    => '#d1d5db',
-                'categories'   => [
-                    'backgroundColor'       => '#374151',
-                    'textColor'             => '#e5e7eb',
-                    'activeBackgroundColor' => '#3b82f6',
-                    'activeTextColor'       => '#ffffff',
-                    'borderColor'           => '#4b5563',
-                ],
-                'pagination' => [
-                    'numbers' => [
-                        'bg' => '#1e1e2e', 'text' => '#e5e7eb', 'border' => '#374151',
-                        'activeBg' => '#3b82f6', 'activeText' => '#ffffff', 'activeBorder' => '#3b82f6',
-                    ],
-                    'loadMore' => [
-                        'bg' => '#3b82f6', 'text' => '#ffffff', 'border' => '#3b82f6',
-                        'hoverBg' => '#2563eb', 'hoverText' => '#ffffff', 'hoverBorder' => '#2563eb',
-                    ],
-                    'infiniteScroll' => ['spinnerColor' => '#3b82f6', 'textColor' => '#9ca3af'],
-                ],
-            ],
+            // The palette itself is CssVars::DARK_PALETTE: the frontend falls back to it for a
+            // view stored before it existed, so there is one copy.
+            'darkMode' => ['enabled' => false] + CssVars::DARK_PALETTE,
             'typography' => [
                 'titleFontSize'   => 18,
                 'titleFontWeight' => 600,

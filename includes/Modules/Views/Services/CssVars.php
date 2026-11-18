@@ -34,6 +34,67 @@ final class CssVars {
     private const OBJECT_FIT = ['cover', 'contain', 'fill', 'none', 'scale-down'];
 
     /**
+     * The colours of dark mode when a view names none of its own.
+     *
+     * A view's `darkMode` branch replaces its light colours while dark mode is on. A view
+     * stored before that branch existed has none, and its LIGHT colours went on being
+     * printed inline - where they beat the stylesheet's `.pxr-dark` defaults, so the listing
+     * stayed light with a few dark badges. collect() now starts from this palette and lays
+     * the view's own dark colours over it. ViewService::default_config() reads the same
+     * constant: one copy.
+     */
+    public const DARK_PALETTE = [
+        'containerBg'    => '#1a1a2e',
+        'cardBg'         => '#1e1e2e',
+        'textColor'      => '#e5e7eb',
+        'titleColor'     => '#f9fafb',
+        'metaColor'      => '#9ca3af',
+        'starColor'      => '#f59e0b',
+        'starEmptyColor' => '#4b5563',
+        'borderColor'    => '#374151',
+        'badgeBg'        => '#374151',
+        'badgeText'      => '#d1d5db',
+        'categories'     => [
+            'backgroundColor'       => '#374151',
+            'textColor'             => '#e5e7eb',
+            'activeBackgroundColor' => '#3b82f6',
+            'activeTextColor'       => '#ffffff',
+            'borderColor'           => '#4b5563',
+        ],
+        'pagination'     => [
+            'numbers'        => [
+                'bg' => '#1e1e2e', 'text' => '#e5e7eb', 'border' => '#374151',
+                'activeBg' => '#3b82f6', 'activeText' => '#ffffff', 'activeBorder' => '#3b82f6',
+            ],
+            'loadMore'       => [
+                'bg' => '#3b82f6', 'text' => '#ffffff', 'border' => '#3b82f6',
+                'hoverBg' => '#2563eb', 'hoverText' => '#ffffff', 'hoverBorder' => '#2563eb',
+            ],
+            'infiniteScroll' => ['spinnerColor' => '#3b82f6', 'textColor' => '#9ca3af'],
+        ],
+    ];
+
+    /**
+     * $own laid over $base, branch by branch. An empty value of $own is no choice at all and
+     * leaves the base colour: a blank field in the editor must not bring the light colour back.
+     *
+     * @param array<string, mixed> $base
+     * @param array<string, mixed> $own
+     * @return array<string, mixed>
+     */
+    private static function over(array $base, array $own): array {
+        foreach ($own as $key => $value) {
+            if (is_array($value) && isset($base[$key]) && is_array($base[$key])) {
+                $base[$key] = self::over($base[$key], $value);
+            } elseif (!isset($base[$key]) || (is_scalar($value) && '' !== (string) $value)) {
+                $base[$key] = $value;
+            }
+        }
+
+        return $base;
+    }
+
+    /**
      * Build inline CSS custom property declarations from view config.
      *
      * @param array $view_config View configuration array.
@@ -44,8 +105,24 @@ final class CssVars {
         $rejected = [];
         $css      = '';
 
-        foreach ($this->collect($view_config, $dark_mode_state, $rejected) as $prop => $value) {
+        $vars = $this->collect($view_config, $dark_mode_state, $rejected);
+        foreach ($vars as $prop => $value) {
             $css .= $prop . ':' . $value . ';';
+        }
+
+        // "auto" follows the visitor's system, which the server cannot know (and a cached
+        // page serves both). So the page carries BOTH palettes: the light one as usual and
+        // the dark one beside it as `--pxr-dark-*`, which the stylesheet's
+        // `prefers-color-scheme: dark` rule reads with `!important`. Without that the light
+        // colours, being inline, beat the rule: a dark panel around white cards.
+        if ('auto' === $dark_mode_state) {
+            $ignored = [];
+            foreach ($this->collect($view_config, 'enabled', $ignored) as $prop => $value) {
+                // Only what dark mode changes; both passes validated their values in put().
+                if (0 === strpos($prop, '--pxr-') && ($vars[$prop] ?? null) !== $value) {
+                    $css .= '--pxr-dark-' . substr($prop, 6) . ':' . $value . ';';
+                }
+            }
         }
 
         return $css;
@@ -82,6 +159,11 @@ final class CssVars {
         $colors      = $this->branch($view_config, 'colors');
         $dark_colors = $this->branch($view_config, 'darkMode');
         $color_from  = [];
+
+        // Dark mode is on: every colour has a dark answer, the view's own where it gave one.
+        if ($dark) {
+            $dark_colors = self::over(self::DARK_PALETTE, $dark_colors);
+        }
 
         if ($dark && !empty($dark_colors)) {
             $dark_keys = ['cardBg', 'textColor', 'titleColor', 'metaColor', 'starColor', 'starEmptyColor', 'borderColor', 'badgeBg', 'badgeText'];

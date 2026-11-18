@@ -18,6 +18,8 @@
  * @var array  $cuisines    Cuisine objects for expanded mode
  * @var array  $courses     Course objects for expanded mode
  * @var array  $current     The visitor's choices (Frontend\VisitorFilters::read())
+ * @var array  $active      The choices in force, each [label, url]: the url is this page without it
+ * @var string $clear_url   This page with no choice at all
  * @var string $unique_id   Unique wrapper ID
  *
  * @package PlugixaRecipe
@@ -38,6 +40,13 @@ $current_level    = (string) ( $current['difficulty'] ?? '' );
 $current_time     = (int) ( $current['max_time'] ?? 0 );
 $current_diet     = (string) ( $current['diet'] ?? '' );
 $courses          = isset( $courses ) ? $courses : array();
+$active           = isset( $active ) && is_array( $active ) ? $active : array();
+$clear_url        = isset( $clear_url ) ? (string) $clear_url : '';
+
+// A filter in force is marked on its own control as well as by its chip.
+$select_class = static function ( $chosen ): string {
+    return 'pxr-widget-search__select' . ( $chosen ? ' pxr-widget-search__select--set' : '' );
+};
 ?>
 
 <div id="<?php echo esc_attr( $unique_id ); ?>"
@@ -62,9 +71,9 @@ $courses          = isset( $courses ) ? $courses : array();
         </div>
 
         <?php if ( $style === 'expanded' ) : ?>
-            <div class="pxr-widget-search__filters pxr:flex pxr:flex-wrap pxr:gap-2 pxr:mt-2">
+            <div class="pxr-widget-search__filters">
                 <?php if ( ! empty( $categories ) ) : ?>
-                    <select name="plugixa_recipe_category" class="pxr-widget-search__select" aria-label="<?php esc_attr_e( 'Filter by category', 'plugixa-recipe' ); ?>">
+                    <select name="plugixa_recipe_category" class="<?php echo esc_attr( $select_class( $current_category ) ); ?>" aria-label="<?php esc_attr_e( 'Filter by category', 'plugixa-recipe' ); ?>">
                         <option value=""><?php esc_html_e( 'All Categories', 'plugixa-recipe' ); ?></option>
                         <?php foreach ( $categories as $recipe_cat ) : ?>
                             <option value="<?php echo esc_attr( $recipe_cat->slug ); ?>"
@@ -76,7 +85,7 @@ $courses          = isset( $courses ) ? $courses : array();
                 <?php endif; ?>
 
                 <?php if ( ! empty( $cuisines ) ) : ?>
-                    <select name="plugixa_recipe_cuisine" class="pxr-widget-search__select" aria-label="<?php esc_attr_e( 'Filter by cuisine', 'plugixa-recipe' ); ?>">
+                    <select name="plugixa_recipe_cuisine" class="<?php echo esc_attr( $select_class( $current_cuisine ) ); ?>" aria-label="<?php esc_attr_e( 'Filter by cuisine', 'plugixa-recipe' ); ?>">
                         <option value=""><?php esc_html_e( 'All Cuisines', 'plugixa-recipe' ); ?></option>
                         <?php foreach ( $cuisines as $cuisine ) : ?>
                             <option value="<?php echo esc_attr( $cuisine->slug ); ?>"
@@ -88,7 +97,7 @@ $courses          = isset( $courses ) ? $courses : array();
                 <?php endif; ?>
 
                 <?php if ( ! empty( $courses ) ) : ?>
-                    <select name="plugixa_recipe_course" class="pxr-widget-search__select" aria-label="<?php esc_attr_e( 'Filter by course', 'plugixa-recipe' ); ?>">
+                    <select name="plugixa_recipe_course" class="<?php echo esc_attr( $select_class( $current_course ) ); ?>" aria-label="<?php esc_attr_e( 'Filter by course', 'plugixa-recipe' ); ?>">
                         <option value=""><?php esc_html_e( 'All Courses', 'plugixa-recipe' ); ?></option>
                         <?php foreach ( $courses as $recipe_course ) : ?>
                             <option value="<?php echo esc_attr( $recipe_course->slug ); ?>"
@@ -99,7 +108,7 @@ $courses          = isset( $courses ) ? $courses : array();
                     </select>
                 <?php endif; ?>
 
-                <select name="plugixa_recipe_time" class="pxr-widget-search__select" aria-label="<?php esc_attr_e( 'Filter by total time', 'plugixa-recipe' ); ?>">
+                <select name="plugixa_recipe_time" class="<?php echo esc_attr( $select_class( $current_time ) ); ?>" aria-label="<?php esc_attr_e( 'Filter by total time', 'plugixa-recipe' ); ?>">
                     <option value=""><?php esc_html_e( 'Any time', 'plugixa-recipe' ); ?></option>
                     <?php foreach ( \PlugixaRecipe\Modules\Shortcodes\Frontend\VisitorFilters::TIMES as $recipe_minutes ) : ?>
                         <option value="<?php echo esc_attr( $recipe_minutes ); ?>" <?php selected( $current_time, $recipe_minutes ); ?>>
@@ -111,7 +120,7 @@ $courses          = isset( $courses ) ? $courses : array();
                     <?php endforeach; ?>
                 </select>
 
-                <select name="plugixa_recipe_difficulty" class="pxr-widget-search__select" aria-label="<?php esc_attr_e( 'Filter by difficulty', 'plugixa-recipe' ); ?>">
+                <select name="plugixa_recipe_difficulty" class="<?php echo esc_attr( $select_class( $current_level ) ); ?>" aria-label="<?php esc_attr_e( 'Filter by difficulty', 'plugixa-recipe' ); ?>">
                     <option value=""><?php esc_html_e( 'Any difficulty', 'plugixa-recipe' ); ?></option>
                     <?php foreach ( \PlugixaRecipe\Modules\Recipes\Enums::difficulty_labels() as $recipe_level => $recipe_level_label ) : ?>
                         <option value="<?php echo esc_attr( $recipe_level ); ?>" <?php selected( $current_level, $recipe_level ); ?>>
@@ -120,7 +129,7 @@ $courses          = isset( $courses ) ? $courses : array();
                     <?php endforeach; ?>
                 </select>
 
-                <select name="plugixa_recipe_diet" class="pxr-widget-search__select" aria-label="<?php esc_attr_e( 'Filter by diet', 'plugixa-recipe' ); ?>">
+                <select name="plugixa_recipe_diet" class="<?php echo esc_attr( $select_class( $current_diet ) ); ?>" aria-label="<?php esc_attr_e( 'Filter by diet', 'plugixa-recipe' ); ?>">
                     <option value=""><?php esc_html_e( 'Any diet', 'plugixa-recipe' ); ?></option>
                     <?php foreach ( \PlugixaRecipe\Modules\Recipes\DietFlags::labels() as $recipe_diet => $recipe_diet_label ) : ?>
                         <option value="<?php echo esc_attr( $recipe_diet ); ?>" <?php selected( $current_diet, $recipe_diet ); ?>>
@@ -134,6 +143,29 @@ $courses          = isset( $courses ) ? $courses : array();
         <button type="submit" class="pxr-widget-search__submit">
             <?php esc_html_e( 'Search', 'plugixa-recipe' ); ?>
         </button>
+
+        <?php if ( $active ) : ?>
+            <?php // Inside the form, so the form and what it is filtering by read as one block. ?>
+            <ul class="pxr-widget-search__active" aria-label="<?php esc_attr_e( 'Filters in use', 'plugixa-recipe' ); ?>">
+                <?php foreach ( $active as $recipe_filter ) : ?>
+                    <li>
+                        <a class="pxr-widget-search__chip" href="<?php echo esc_url( $recipe_filter['url'] ); ?>" rel="nofollow">
+                            <span class="pxr-widget-search__chip-label"><?php echo esc_html( $recipe_filter['label'] ); ?></span>
+                            <span class="screen-reader-text"><?php esc_html_e( '(remove this filter)', 'plugixa-recipe' ); ?></span>
+                            <svg class="pxr-widget-search__chip-x" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                            </svg>
+                        </a>
+                    </li>
+                <?php endforeach; ?>
+                <?php if ( count( $active ) > 1 && '' !== $clear_url ) : ?>
+                    <li>
+                        <a class="pxr-widget-search__clear" href="<?php echo esc_url( $clear_url ); ?>" rel="nofollow"><?php esc_html_e( 'Clear all', 'plugixa-recipe' ); ?></a>
+                    </li>
+                <?php endif; ?>
+            </ul>
+        <?php endif; ?>
     </form>
 
 </div>

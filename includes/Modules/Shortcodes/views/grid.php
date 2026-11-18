@@ -105,6 +105,7 @@ $cat_display_style = $view_config['categories']['displayStyle'] ?? 'none';
             </div>
         <?php else : ?>
             <nav class="pxr-custom-category-nav pxr-custom-category-nav--<?php echo esc_attr( $cat_display_style ?: 'pills' ); ?> pxr:flex pxr:flex-wrap pxr:mb-6 pxr:justify-center"
+                 data-pxr-label="<?php esc_attr_e( 'Category', 'plugixa-recipe' ); ?>"
                  aria-label="<?php esc_attr_e( 'Filter by category', 'plugixa-recipe' ); ?>">
                 <button type="button"
                         class="pxr-custom-category-btn pxr-custom-category-btn--active"
@@ -127,6 +128,7 @@ $cat_display_style = $view_config['categories']['displayStyle'] ?? 'none';
     <?php if ( $show_cuisines && ! empty( $all_cuisines ) ) : ?>
         <!-- Cuisine Navigation (uses same category CSS vars for styling) -->
         <nav class="pxr-custom-cuisine-nav pxr-custom-category-nav--<?php echo esc_attr( $cat_display_style ?: 'pills' ); ?> pxr:flex pxr:flex-wrap pxr:mb-6 pxr:justify-center"
+             data-pxr-label="<?php esc_attr_e( 'Cuisine', 'plugixa-recipe' ); ?>"
              aria-label="<?php esc_attr_e( 'Filter by cuisine', 'plugixa-recipe' ); ?>">
             <button type="button"
                     class="pxr-custom-cuisine-btn pxr-custom-cuisine-btn--active"
@@ -187,8 +189,7 @@ $cat_display_style = $view_config['categories']['displayStyle'] ?? 'none';
     <?php if ( ! empty( $recipes ) ) : ?>
         <!-- Grid -->
         <div class="pxr-custom-grid pxr:grid pxr:gap-6"
-             role="list"
-             style="grid-template-columns: repeat(var(--pxr-columns-desktop, 3), 1fr);">
+             role="list">
             <?php foreach ( $recipes as $recipe ) :
                 $cat_slugs = array();
                 if ( ! empty( $recipe->categories ) && is_array( $recipe->categories ) ) {

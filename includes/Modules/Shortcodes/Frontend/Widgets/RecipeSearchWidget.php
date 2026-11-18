@@ -39,15 +39,24 @@ final class RecipeSearchWidget extends Widget {
 
         $this->enqueue_assets();
 
-        // The expanded form offers every filter a listing can be narrowed by.
+        // What the visitor already chose, narrowed the same way the listing reads it.
+        $current  = VisitorFilters::read();
+        $expanded = 'expanded' === $atts['style'];
+
+        // The expanded form offers every filter a listing can be narrowed by. A simple form
+        // needs the terms too when a link brought one along, to name it in its chip.
         $categories = [];
         $cuisines   = [];
         $courses    = [];
-        if ( $atts['style'] === 'expanded' ) {
-            // Read-through object cache; these queries take no inputs.
+        // Read-through object cache; these queries take no inputs.
+        if ( $expanded || '' !== $current['category'] ) {
             $categories = $this->widgets()->search_categories();
-            $cuisines   = $this->widgets()->search_cuisines();
-            $courses    = $this->widgets()->search_courses();
+        }
+        if ( $expanded || '' !== $current['cuisine'] ) {
+            $cuisines = $this->widgets()->search_cuisines();
+        }
+        if ( $expanded || '' !== $current['course'] ) {
+            $courses = $this->widgets()->search_courses();
         }
 
         $form = $this->render_template( 'recipe-search', [
@@ -55,15 +64,75 @@ final class RecipeSearchWidget extends Widget {
             'style'       => sanitize_key( $atts['style'] ),
             'action'      => esc_url( $atts['action'] ) ?: '',
             'title'       => sanitize_text_field( $atts['title'] ),
-            'categories'  => $categories,
-            'cuisines'    => $cuisines,
-            'courses'     => $courses,
-            // What the visitor already chose, narrowed the same way the listing reads it.
-            'current'     => VisitorFilters::read(),
+            'categories'  => $expanded ? $categories : [],
+            'cuisines'    => $expanded ? $cuisines : [],
+            'courses'     => $expanded ? $courses : [],
+            'current'     => $current,
+            'active'      => $this->active_filters( $current, $categories, $cuisines, $courses ),
+            'clear_url'   => remove_query_arg( array_values( self::FIELDS ) ),
             'unique_id'   => 'pxr-widget-' . uniqid(),
         ] );
 
         return $form . $this->own_results( (string) $atts['action'] );
+    }
+
+    /** A VisitorFilters key and the GET field that carries it. */
+    private const FIELDS = [
+        'search'     => 'plugixa_recipe_search',
+        'category'   => 'plugixa_recipe_category',
+        'cuisine'    => 'plugixa_recipe_cuisine',
+        'course'     => 'plugixa_recipe_course',
+        'max_time'   => 'plugixa_recipe_time',
+        'difficulty' => 'plugixa_recipe_difficulty',
+        'diet'       => 'plugixa_recipe_diet',
+    ];
+
+    /**
+     * One chip per choice in force: what it says and the address of this page without it.
+     *
+     * Built from VisitorFilters::read(), so a chip can only name a filter the listing applied.
+     * A term that no longer exists is named by its slug: the listing shows nothing for it,
+     * and the chip is the way out.
+     *
+     * @param array<string, string|int> $current
+     * @param array<int, object>        $categories
+     * @param array<int, object>        $cuisines
+     * @param array<int, object>        $courses
+     * @return array<int, array{label:string, url:string}>
+     */
+    private function active_filters( array $current, array $categories, array $cuisines, array $courses ): array {
+        $term = static function ( array $terms, string $slug ): string {
+            foreach ( $terms as $candidate ) {
+                if ( $candidate->slug === $slug ) {
+                    return (string) $candidate->name;
+                }
+            }
+            return $slug;
+        };
+
+        $labels = [
+            /* translators: %s: the words a visitor searched for. */
+            'search'     => '' !== $current['search'] ? sprintf( __( '"%s"', 'plugixa-recipe' ), $current['search'] ) : '',
+            'category'   => '' !== $current['category'] ? $term( $categories, $current['category'] ) : '',
+            'cuisine'    => '' !== $current['cuisine'] ? $term( $cuisines, $current['cuisine'] ) : '',
+            'course'     => '' !== $current['course'] ? $term( $courses, $current['course'] ) : '',
+            /* translators: %s: a length of time, e.g. "30 mins". */
+            'max_time'   => $current['max_time'] ? sprintf( __( 'Ready in %s', 'plugixa-recipe' ), \PlugixaRecipe\Modules\Recipes\Services\RecipePresenter::duration_label( $current['max_time'] * MINUTE_IN_SECONDS ) ) : '',
+            'difficulty' => (string) ( \PlugixaRecipe\Modules\Recipes\Enums::difficulty_labels()[ $current['difficulty'] ] ?? '' ),
+            'diet'       => (string) ( \PlugixaRecipe\Modules\Recipes\DietFlags::labels()[ $current['diet'] ] ?? '' ),
+        ];
+
+        $active = [];
+        foreach ( $labels as $key => $label ) {
+            if ( '' !== $label ) {
+                $active[] = [
+                    'label' => $label,
+                    'url'   => remove_query_arg( self::FIELDS[ $key ] ),
+                ];
+            }
+        }
+
+        return $active;
     }
 
     /** Set once the results below have been printed, so two forms on a page list them once. */

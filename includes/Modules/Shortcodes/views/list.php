@@ -88,6 +88,7 @@ if ( $show_alpha ) {
     <?php if ( $show_categories && ! empty( $all_categories ) ) : ?>
         <!-- Category Navigation -->
         <nav class="pxr-custom-category-nav pxr:flex pxr:flex-wrap pxr:gap-2 pxr:mb-6 pxr:justify-center"
+             data-pxr-label="<?php esc_attr_e( 'Category', 'plugixa-recipe' ); ?>"
              aria-label="<?php esc_attr_e( 'Filter by category', 'plugixa-recipe' ); ?>">
             <button type="button"
                     class="pxr-custom-category-btn pxr-custom-category-btn--active pxr:px-4 pxr:py-2 pxr:rounded-full pxr:text-sm pxr:font-medium pxr:border pxr:cursor-pointer pxr:transition-colors pxr:duration-200"
@@ -109,6 +110,7 @@ if ( $show_alpha ) {
     <?php if ( $show_cuisines && ! empty( $all_cuisines ) ) : ?>
         <!-- Cuisine Navigation -->
         <nav class="pxr-custom-cuisine-nav pxr:flex pxr:flex-wrap pxr:gap-2 pxr:mb-6 pxr:justify-center"
+             data-pxr-label="<?php esc_attr_e( 'Cuisine', 'plugixa-recipe' ); ?>"
              aria-label="<?php esc_attr_e( 'Filter by cuisine', 'plugixa-recipe' ); ?>">
             <button type="button"
                     class="pxr-custom-cuisine-btn pxr-custom-cuisine-btn--active pxr:px-4 pxr:py-2 pxr:rounded-full pxr:text-sm pxr:font-medium pxr:border pxr:cursor-pointer pxr:transition-colors pxr:duration-200"

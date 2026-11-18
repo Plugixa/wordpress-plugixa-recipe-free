@@ -38,8 +38,9 @@ defined( 'ABSPATH' ) || exit;
             <?php foreach ( $items as $item ) : ?>
                 <li class="pxr-widget-taxonomy__list-item">
                     <a href="<?php echo esc_url( $item->permalink ); ?>"
-                       class="pxr-widget-taxonomy__link">
-                        <svg class="pxr-widget-taxonomy__chevron" width="6" height="10" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                       class="pxr-widget-taxonomy__link<?php echo ! empty( $item->is_current ) ? ' pxr-widget-taxonomy__link--current' : ''; ?>"
+                       <?php echo ! empty( $item->is_current ) ? 'aria-current="page"' : ''; ?>>
+                        <svg class="pxr-widget-taxonomy__chevron" width="6" height="10" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                             <path d="M1 1L5 5L1 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                         <span class="pxr-widget-taxonomy__name"><?php echo esc_html( $item->name ); ?></span>
@@ -53,10 +54,11 @@ defined( 'ABSPATH' ) || exit;
 
     <?php elseif ( $style === 'pills' ) : ?>
 
-        <div class="pxr-widget-taxonomy__pills pxr:flex pxr:flex-wrap pxr:gap-2">
+        <div class="pxr-widget-taxonomy__pills">
             <?php foreach ( $items as $item ) : ?>
                 <a href="<?php echo esc_url( $item->permalink ); ?>"
-                   class="pxr-widget-taxonomy__pill">
+                   class="pxr-widget-taxonomy__pill<?php echo ! empty( $item->is_current ) ? ' pxr-widget-taxonomy__pill--current' : ''; ?>"
+                   <?php echo ! empty( $item->is_current ) ? 'aria-current="page"' : ''; ?>>
                     <?php echo esc_html( $item->name ); ?>
                     <?php if ( $show_count ) : ?>
                         <span class="pxr-widget-taxonomy__pill-count"><?php echo absint( $item->recipe_count ); ?></span>
@@ -67,19 +69,33 @@ defined( 'ABSPATH' ) || exit;
 
     <?php elseif ( $style === 'grid' ) : ?>
 
-        <div class="pxr-widget-taxonomy__grid pxr:grid pxr:grid-cols-2 pxr:gap-3">
+        <div class="pxr-widget-taxonomy__grid">
             <?php foreach ( $items as $item ) : ?>
                 <a href="<?php echo esc_url( $item->permalink ); ?>"
-                   class="pxr-widget-taxonomy__card pxr:flex pxr:flex-col pxr:items-center pxr:text-center pxr:p-4 pxr:rounded-lg">
+                   class="pxr-widget-taxonomy__card<?php echo ! empty( $item->is_current ) ? ' pxr-widget-taxonomy__card--current' : ''; ?>"
+                   <?php echo ! empty( $item->is_current ) ? 'aria-current="page"' : ''; ?>>
                     <?php if ( ! empty( $item->image_url ) ) : ?>
                         <img src="<?php echo esc_url( $item->image_url ); ?>"
-                             alt="<?php echo esc_attr( $item->name ); ?>"
-                             class="pxr-widget-taxonomy__card-image pxr:w-16 pxr:h-16 pxr:rounded-full pxr:object-cover pxr:mb-2"
+                             alt=""
+                             class="pxr-widget-taxonomy__card-image"
                              loading="lazy" />
+                    <?php else : ?>
+                        <?php // No picture: the term's first letter stands in, so the cards keep one height. ?>
+                        <span class="pxr-widget-taxonomy__card-image pxr-widget-taxonomy__card-image--letter" aria-hidden="true"><?php echo esc_html( function_exists( 'mb_substr' ) ? mb_strtoupper( mb_substr( (string) $item->name, 0, 1 ) ) : strtoupper( substr( (string) $item->name, 0, 1 ) ) ); ?></span>
                     <?php endif; ?>
                     <span class="pxr-widget-taxonomy__card-name"><?php echo esc_html( $item->name ); ?></span>
                     <?php if ( $show_count ) : ?>
-                        <span class="pxr-widget-taxonomy__card-count"><?php echo absint( $item->recipe_count ); ?> <?php esc_html_e( 'recipes', 'plugixa-recipe' ); ?></span>
+                        <span class="pxr-widget-taxonomy__card-count">
+                            <?php
+                            echo esc_html(
+                                sprintf(
+                                    /* translators: %d: number of recipes. */
+                                    _n( '%d recipe', '%d recipes', absint( $item->recipe_count ), 'plugixa-recipe' ),
+                                    absint( $item->recipe_count )
+                                )
+                            );
+                            ?>
+                        </span>
                     <?php endif; ?>
                 </a>
             <?php endforeach; ?>

@@ -40,6 +40,9 @@ if ( ! $archive_term ) {
     <!-- Archive Header -->
     <?php include plugixa_recipe_template( 'archive/header.php' ); ?>
 
+    <!-- The other categories / cuisines -->
+    <?php include plugixa_recipe_template( 'archive/terms.php' ); ?>
+
     <!-- Recipe Grid -->
     <?php if ( ! empty( $recipes ) ) : ?>
         <div class="pxr-custom-grid pxr-archive__grid">
