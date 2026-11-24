@@ -4,7 +4,7 @@ Tags: recipe, recipes, recipe card, nutrition, schema
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.4.2
+Stable tag: 1.4.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -242,6 +242,9 @@ WordPress oEmbed provider list: https://developer.wordpress.org/advanced-adminis
 
 == Changelog ==
 
+= 1.4.3 =
+* Maintenance release: no change to the free features.
+
 = 1.4.2 =
 * Changed: the recipe search form puts the words and the button on one row and the filters in a grid, shows one chip per filter in force with "Clear all", and lets a visitor remove a filter by its chip.
 * Changed: category and cuisine lists use a grid that fills the width, show a letter tile for a term with no picture and mark the current term. New `hide_empty` attribute.
@@ -329,6 +332,9 @@ WordPress oEmbed provider list: https://developer.wordpress.org/advanced-adminis
 * REST API and developer hooks
 
 == Upgrade Notice ==
+
+= 1.4.3 =
+Maintenance release. Nothing changes in the free features.
 
 = 1.4.2 =
 New look for the search form, term lists and filter bars, grid listings that fit a phone, and dark mode applied in full. Coming from 1.3.0? Read the 1.4.0 notes: several features moved to Pro, and your data is kept.

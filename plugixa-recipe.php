@@ -4,7 +4,7 @@
  * Plugin Name: Plugixa Recipe – Recipe Cards, Nutrition Facts, Reviews & Schema
  * Plugin URI: https://www.plugixa.com/plugins/plugixa-recipe
  * Description: A modern recipe management plugin with React admin panel, nutrition facts, user reviews, favourites, and multiple display layouts.
- * Version: 1.4.2
+ * Version: 1.4.3
  * Author: Plugixa
  * Author URI: https://plugixa.com
  * Copyright (C) 2026 Plugixa (https://plugixa.com)
@@ -38,7 +38,7 @@ if ( function_exists( 'plugixa_recipe_fs_pxr' ) ) {
     return;
 }
 // Plugin constants
-define( 'PLUGIXA_RECIPE_VERSION', '1.4.2' );
+define( 'PLUGIXA_RECIPE_VERSION', '1.4.3' );
 define( 'PLUGIXA_RECIPE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'PLUGIXA_RECIPE_URL', plugin_dir_url( __FILE__ ) );
 define( 'PLUGIXA_RECIPE_BASENAME', plugin_basename( __FILE__ ) );
