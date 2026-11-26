@@ -155,6 +155,9 @@
         function showMessage(type, text) {
             messagesEl.classList.remove('pxr:hidden');
             if (type === 'success') {
+                // The server says whether the review is live or waits for a moderator;
+                // the printed text is only the fallback.
+                if (text) successEl.textContent = text;
                 successEl.classList.remove('pxr:hidden');
                 errorEl.classList.add('pxr:hidden');
             } else {
@@ -252,7 +255,7 @@
                 .then(function (result) {
                     setLoading(false);
                     if (result.ok) {
-                        showMessage('success');
+                        showMessage('success', result.data && result.data.message);
                         form.reset();
                         currentRating = 0;
                         updateStars(0);

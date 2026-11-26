@@ -199,7 +199,8 @@ final class PublicReviewService {
     /**
      * Step 2 of a submission: write the review row.
      *
-     * It is stored as `pending` when moderation is on and `approved` otherwise.
+     * Its status is status_for(): the moderation setting, or `approved` for a signed-in member
+     * a listener trusts.
      *
      * @param array<string, mixed> $submission What validate_submission() returned.
      * @param string               $author_ip  The caller's address, as stored with the review.
@@ -208,7 +209,7 @@ final class PublicReviewService {
     public function store(array $submission, string $author_ip): array {
         $settings = $submission['settings'];
 
-        $default_status = !empty($settings['review_moderation']) ? 'pending' : 'approved';
+        $default_status = self::status_for($settings, get_current_user_id(), (int) $submission['recipe_id']);
 
         $review_id = $this->reviews->insert([
             'recipe_id'    => $submission['recipe_id'],
@@ -227,6 +228,44 @@ final class PublicReviewService {
             'id'     => $review_id,
             'status' => $default_status,
         ];
+    }
+
+    /**
+     * The status a new public review is stored with. The ONE place that decides it.
+     *
+     * Moderation off: `approved` for everybody. Moderation on: `pending`, unless the reviewer is
+     * signed in and a listener on `plugixa_recipe_public_review_status` answers `approved`
+     * (the premium Permissions app does, for a role with "Post reviews without approval").
+     * A visitor who is not signed in always waits, and an answer that is neither status is
+     * ignored, never stored.
+     *
+     * @since 1.5.0
+     *
+     * @param array<string, mixed> $settings  The plugin settings.
+     * @param int                  $user_id   The reviewer, 0 when not signed in.
+     * @param int                  $recipe_id The recipe reviewed.
+     */
+    public static function status_for(array $settings, int $user_id, int $recipe_id): string {
+        if (empty($settings['review_moderation'])) {
+            return 'approved';
+        }
+
+        if ($user_id <= 0) {
+            return 'pending';
+        }
+
+        /**
+         * Filters the status of a review a signed-in member posts while moderation is on.
+         *
+         * @since 1.5.0
+         *
+         * @param string $status    `pending`. Return `approved` to publish it straight away.
+         * @param int    $user_id   The reviewer.
+         * @param int    $recipe_id The recipe reviewed.
+         */
+        $status = apply_filters('plugixa_recipe_public_review_status', 'pending', $user_id, $recipe_id);
+
+        return 'approved' === $status ? 'approved' : 'pending';
     }
 
     /**
