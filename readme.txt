@@ -4,7 +4,7 @@ Tags: recipe, recipes, recipe card, nutrition, schema
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.5.0
+Stable tag: 1.5.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -242,6 +242,9 @@ WordPress oEmbed provider list: https://developer.wordpress.org/advanced-adminis
 
 == Changelog ==
 
+= 1.5.1 =
+* Maintenance release: no change to the free features.
+
 = 1.5.0 =
 * Changed: after posting a review, the visitor is told whether it is live or waits for moderation (the form always said "submitted successfully").
 * Developers: new filter `plugixa_recipe_public_review_status` decides whether a signed-in member's review skips moderation. Visitors who are not signed in always wait while moderation is on.
@@ -336,6 +339,9 @@ WordPress oEmbed provider list: https://developer.wordpress.org/advanced-adminis
 * REST API and developer hooks
 
 == Upgrade Notice ==
+
+= 1.5.1 =
+Maintenance release. Nothing changes in the free features.
 
 = 1.5.0 =
 Reviewers now see whether their review is live or waiting for moderation. Nothing else changes in the free features.
